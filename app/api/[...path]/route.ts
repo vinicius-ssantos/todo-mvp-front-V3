@@ -9,7 +9,7 @@ function joinUrl(base: string, path: string, search?: string) {
 }
 function isAuthPath(localPath: string) {
     const p = localPath.replace(/^\/+/, "")
-    return p.startsWith("auth/") // cobre /auth/login e /auth/register
+    return p.startsWith("auth/") // /auth/login, /auth/register
 }
 function stripBearer(t?: string) {
     return (t || "").replace(/^Bearer\s+/i, "")
@@ -23,15 +23,11 @@ async function handleRequest(req: NextRequest) {
             return NextResponse.json({ message: "API_BASE_URL ausente" }, { status: 500 })
         }
 
-        // Monta caminho local (sem o prefixo /api) e a URL final
         const localPath = req.nextUrl.pathname.replace(/^\/api/, "")
         const search = req.nextUrl.searchParams.toString()
+        const upstreamUrl = joinUrl(base, localPath, search)
 
-        const b = base.replace(/\/+$/, "")
-        const p = localPath.replace(/^\/api\/?/, "").replace(/^\/+/, "")
-        const upstreamUrl = `${b}/${p}${search ? `?${search}` : ""}`
-
-        // Clona headers e remove tudo que possa acionar regras de CORS/navegador no backend
+        // Clona e limpa headers que não fazem sentido em server-to-server
         const headers = new Headers(req.headers)
         ;[
             "host",
@@ -50,10 +46,8 @@ async function handleRequest(req: NextRequest) {
             "x-forwarded-proto",
         ].forEach((h) => headers.delete(h))
 
-        // Injeta Authorization: Bearer <jwt> se NÃO for rota de auth
-        const isAuthPath = localPath.replace(/^\/+/, "").startsWith("auth/")
-        const cookieToken = (req.cookies.get("access_token")?.value || "").replace(/^Bearer\s+/i, "")
-        const useAuth = Boolean(cookieToken) && !isAuthPath
+        const cookieToken = stripBearer(req.cookies.get("access_token")?.value)
+        const useAuth = Boolean(cookieToken) && !isAuthPath(localPath)
         if (useAuth) {
             headers.set("Authorization", `Bearer ${cookieToken}`)
         } else {
@@ -71,20 +65,18 @@ async function handleRequest(req: NextRequest) {
                 body = await req.text()
             }
         } else {
-            // Evita mandar Content-Type em GET
             headers.delete("content-type")
         }
 
         const upstream = await fetch(upstreamUrl, { method, headers, body, cache: "no-store" })
 
-        // Replica resposta + cabeçalhos úteis p/ diagnóstico
         const resHeaders = new Headers(upstream.headers)
         resHeaders.set("Access-Control-Allow-Origin", "*")
         resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
         resHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
         resHeaders.set("x-bff-latency-ms", String(Date.now() - start))
         resHeaders.set("x-bff-auth", useAuth ? "1" : "0")
-        resHeaders.set("x-bff-upstream-url", upstreamUrl) // 👈 veja no Network qual URL exata foi chamada
+        resHeaders.set("x-bff-upstream-url", upstreamUrl)
 
         const blob = await upstream.blob()
         return new NextResponse(blob, { status: upstream.status, headers: resHeaders })
