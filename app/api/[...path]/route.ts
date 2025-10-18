@@ -1,117 +1,87 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-/**
- * Universal proxy/BFF that forwards requests to the backend API
- * Automatically injects Authorization header from HttpOnly cookie
- */
-async function handleRequest(req: NextRequest) {
-  const startTime = Date.now()
+export const dynamic = "force-dynamic"
 
-  try {
-    // Extract path from URL (remove /api prefix)
-    const path = req.nextUrl.pathname.replace(/^\/api/, "")
-    const searchParams = req.nextUrl.searchParams.toString()
-    const url = `${process.env.API_BASE_URL}${path}${searchParams ? `?${searchParams}` : ""}`
-
-    // Get access token from cookie
-    const token = req.cookies.get("access_token")?.value
-
-    // Prepare headers
-    const headers = new Headers()
-
-    // Copy relevant headers from original request
-    const headersToForward = ["content-type", "accept", "accept-language"]
-    headersToForward.forEach((header) => {
-      const value = req.headers.get(header)
-      if (value) headers.set(header, value)
-    })
-
-    // Inject Authorization header if token exists
-    if (token && !headers.has("authorization")) {
-      headers.set("Authorization", `Bearer ${token}`)
-    }
-
-    // Prepare request body
-    let body: BodyInit | null = null
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      const contentType = req.headers.get("content-type") || ""
-      if (contentType.includes("application/json")) {
-        body = JSON.stringify(await req.json())
-      } else {
-        body = await req.text()
-      }
-    }
-
-    // Forward request to upstream API
-    const upstream = await fetch(url, {
-      method: req.method,
-      headers,
-      body,
-      cache: "no-store",
-      // @ts-ignore - duplex is needed for streaming
-      duplex: "half",
-    })
-
-    // Log request for observability
-    const duration = Date.now() - startTime
-    console.log(`[Proxy] ${req.method} ${path} → ${upstream.status} (${duration}ms)`)
-
-    // Get response body
-    const contentType = upstream.headers.get("content-type") || ""
-    let responseBody: any
-
-    if (contentType.includes("application/json")) {
-      responseBody = await upstream.json()
-    } else {
-      responseBody = await upstream.text()
-    }
-
-    // Create response with same status and headers
-    const response = NextResponse.json(responseBody, {
-      status: upstream.status,
-      statusText: upstream.statusText,
-    })
-
-    // Copy relevant response headers
-    const headersToCopy = ["content-type", "cache-control", "etag"]
-    headersToCopy.forEach((header) => {
-      const value = upstream.headers.get(header)
-      if (value) response.headers.set(header, value)
-    })
-
-    // Add CORS headers if needed
-    response.headers.set("Access-Control-Allow-Credentials", "true")
-
-    return response
-  } catch (error: any) {
-    const duration = Date.now() - startTime
-    console.error(`[Proxy Error] ${req.method} ${req.nextUrl.pathname} (${duration}ms)`, error)
-
-    return NextResponse.json(
-      {
-        message: "Erro ao processar requisição",
-        error: error?.message || "Erro desconhecido",
-      },
-      { status: 500 },
-    )
-  }
+function joinUrl(base: string, path: string, search?: string) {
+    const b = (base || "").replace(/\/+$/, "")
+    const p = (path || "").replace(/^\/api\/?/, "").replace(/^\/+/, "")
+    return `${b}/${p}${search ? `?${search}` : ""}`
 }
 
-// Export handlers for all HTTP methods
+function isAuthPath(localPath: string) {
+    // localPath já vem sem o prefixo /api
+    const p = localPath.replace(/^\/+/, "")
+    return p.startsWith("auth/") // cobre /auth/login e /auth/register
+}
+
+async function handleRequest(req: NextRequest) {
+    const start = Date.now()
+    try {
+        const base = process.env.API_BASE_URL || ""
+        if (!base) {
+            return NextResponse.json({ message: "API_BASE_URL ausente" }, { status: 500 })
+        }
+
+        const localPath = req.nextUrl.pathname.replace(/^\/api/, "") // mantém leading slash
+        const search = req.nextUrl.searchParams.toString()
+        const url = joinUrl(base, localPath, search)
+
+        // Monta headers para upstream
+        const headers = new Headers(req.headers)
+        headers.delete("host")
+        headers.delete("cookie")
+
+        // Injeta Authorization APENAS se NÃO for rota de auth
+        const token = req.cookies.get("access_token")?.value
+        if (token && !isAuthPath(localPath)) {
+            headers.set("Authorization", `Bearer ${token}`)
+        } else {
+            headers.delete("authorization")
+        }
+
+        // Corpo
+        let body: BodyInit | null = null
+        const method = req.method.toUpperCase()
+        if (!["GET", "HEAD"].includes(method)) {
+            const ct = headers.get("content-type") || ""
+            if (ct.includes("multipart/form-data")) {
+                body = await req.formData()
+            } else {
+                body = await req.text()
+            }
+        }
+
+        const upstream = await fetch(url, { method, headers, body, cache: "no-store" })
+
+        const resHeaders = new Headers(upstream.headers)
+        // CORS básico (opcional)
+        resHeaders.set("Access-Control-Allow-Origin", "*")
+        resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+        resHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+        const blob = await upstream.blob()
+        const res = new NextResponse(blob, { status: upstream.status, headers: resHeaders })
+        res.headers.set("x-bff-latency-ms", String(Date.now() - start))
+        return res
+    } catch (err: any) {
+        console.error("[BFF Error]", err)
+        return NextResponse.json({ message: "Erro no proxy/BFF", error: err?.message }, { status: 500 })
+    }
+}
+
 export const GET = handleRequest
 export const POST = handleRequest
 export const PUT = handleRequest
 export const PATCH = handleRequest
 export const DELETE = handleRequest
-export const OPTIONS = async (req: NextRequest) => {
-  // Handle CORS preflight
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
-    },
-  })
+export async function OPTIONS() {
+    return new NextResponse(null, {
+        status: 204,
+        headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400",
+        },
+    })
 }
