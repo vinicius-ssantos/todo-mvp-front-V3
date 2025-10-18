@@ -1,108 +1,105 @@
-import { NextResponse, type NextRequest } from "next/server"
+// app/api/[...path]/route.ts
+import { NextRequest } from "next/server"
 
 export const dynamic = "force-dynamic"
 
-function joinUrl(base: string, path: string, search?: string) {
-    const b = (base || "").replace(/\/+$/, "")
-    const p = (path || "").replace(/^\/api\/?/, "").replace(/^\/+/, "")
-    return `${b}/${p}${search ? `?${search}` : ""}`
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8082/api"
+
+// Junta respeitando barras
+function joinUrl(base: string, path: string) {
+  return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
 }
+
+// Qualquer coisa sob /auth/** é rota pública de auth (não injeta Authorization)
 function isAuthPath(localPath: string) {
-    const p = localPath.replace(/^\/+/, "")
-    return p.startsWith("auth/") // /auth/login, /auth/register
-}
-function stripBearer(t?: string) {
-    return (t || "").replace(/^Bearer\s+/i, "")
+  const p = localPath.replace(/^\/+/, "")
+  return /(^|\/)auth\//i.test(p)
 }
 
-async function handleRequest(req: NextRequest) {
-    const start = Date.now()
-    try {
-        const base = process.env.API_BASE_URL || ""
-        if (!base) {
-            return NextResponse.json({ message: "API_BASE_URL ausente" }, { status: 500 })
-        }
+async function proxy(req: NextRequest) {
+  const { pathname, search } = req.nextUrl
+  const localPath = pathname.replace(/^\/api\/?/, "") // tira o prefixo /api/
+  const upstreamUrl = joinUrl(API_BASE_URL, localPath) + (search || "")
 
-        const localPath = req.nextUrl.pathname.replace(/^\/api/, "")
-        const search = req.nextUrl.searchParams.toString()
-        const upstreamUrl = joinUrl(base, localPath, search)
+  const method = req.method.toUpperCase()
 
-        // Clona e limpa headers “de navegador”
-        const headers = new Headers(req.headers)
-        ;[
-            "host",
-            "cookie",
-            "origin",
-            "referer",
-            "sec-ch-ua",
-            "sec-ch-ua-mobile",
-            "sec-ch-ua-platform",
-            "sec-fetch-dest",
-            "sec-fetch-mode",
-            "sec-fetch-site",
-            "sec-fetch-user",
-            "sec-gpc",
-            "x-forwarded-host",
-            "x-forwarded-proto",
-        ].forEach((h) => headers.delete(h))
+  // Copia headers úteis, removendo os que não fazem sentido para upstream
+  const headers = new Headers(req.headers)
+  headers.delete("host")
+  headers.delete("connection")
+  headers.delete("accept-encoding")
 
-        // Injeta Authorization em rotas NÃO-auth
-        const cookieToken = stripBearer(req.cookies.get("access_token")?.value)
-        const useAuth = Boolean(cookieToken) && !isAuthPath(localPath)
-        if (useAuth) {
-            headers.set("Authorization", `Bearer ${cookieToken}`)
-        } else {
-            headers.delete("authorization")
-        }
+  // Controle de Authorization por cookie (ex.: access_token)
+  const cookieToken = req.cookies.get("access_token")?.value
+  const useAuth = !!cookieToken && !isAuthPath(localPath)
 
-        // Corpo
-        let body: BodyInit | null = null
-        const method = req.method.toUpperCase()
-        if (!["GET", "HEAD"].includes(method)) {
-            const ct = headers.get("content-type") || ""
-            if (ct.includes("multipart/form-data")) {
-                body = await req.formData()
-            } else {
-                body = await req.text()
-            }
-        } else {
-            headers.delete("content-type")
-        }
+  if (useAuth) {
+    headers.set("authorization", `Bearer ${cookieToken}`)
+  } else {
+    headers.delete("authorization")
+  }
 
-        const upstream = await fetch(upstreamUrl, {
-            method, headers, body, cache: "no-store",
-        })
+  // Logs ANTES do fetch (como pedido)
+  console.log("[BFF->Upstream]", {
+    method,
+    upstreamUrl,
+    useAuth,
+    hasAuthHeader: headers.has("authorization"),
+  })
 
-        const resHeaders = new Headers(upstream.headers)
-        resHeaders.set("Access-Control-Allow-Origin", "*")
-        resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-        resHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        resHeaders.set("x-bff-latency-ms", String(Date.now() - start))
-        resHeaders.set("x-bff-auth", useAuth ? "1" : "0")
-        resHeaders.set("x-bff-upstream-url", upstreamUrl)
+  // Pass-through de body (quando houver). Em Node 18+, para streaming, usar duplex: 'half'
+  const hasBody = !["GET", "HEAD"].includes(method)
+  const init: RequestInit = {
+    method,
+    headers,
+    cache: "no-store",
+    // @ts-expect-error Node fetch aceita duplex
+    duplex: hasBody ? "half" : undefined,
+    body: hasBody ? req.body : undefined,
+  }
 
-        const blob = await upstream.blob()
-        return new NextResponse(blob, { status: upstream.status, headers: resHeaders })
-    } catch (err: any) {
-        console.error("[BFF Error]", err)
-        return NextResponse.json({ message: "Erro no proxy/BFF", error: err?.message }, { status: 500 })
-    }
-}
-
-export const GET = handleRequest
-export const POST = handleRequest
-export const PUT = handleRequest
-export const PATCH = handleRequest
-export const DELETE = handleRequest
-
-export async function OPTIONS() {
-    return new NextResponse(null, {
-        status: 204,
+  let upstream: Response
+  try {
+    upstream = await fetch(upstreamUrl, init)
+  } catch (e: any) {
+    console.error("[BFF error] fetch failed", { upstreamUrl, error: e?.message })
+    return new Response(
+      JSON.stringify({ ok: false, message: "Upstream indisponível", error: e?.message }),
+      {
+        status: 502,
         headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Max-Age": "86400",
+          "content-type": "application/json",
+          "x-bff-upstream-url": upstreamUrl,
         },
-    })
+      }
+    )
+  }
+
+  // Logs DEPOIS do fetch (como pedido)
+  console.log("[BFF<-Upstream]", {
+    status: upstream.status,
+    upstreamUrl,
+  })
+
+  // Repasse de headers essenciais
+  const outHeaders = new Headers(upstream.headers)
+  outHeaders.set("x-bff-upstream-url", upstreamUrl)
+
+  // Evita problemas com encodings transfer-encoding/chunked
+  outHeaders.delete("content-encoding")
+  outHeaders.delete("transfer-encoding")
+  outHeaders.delete("content-length")
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: outHeaders,
+  })
 }
+
+// Exporta todos os métodos que você usa
+export const GET = proxy
+export const POST = proxy
+export const PUT = proxy
+export const PATCH = proxy
+export const DELETE = proxy
+export const OPTIONS = proxy

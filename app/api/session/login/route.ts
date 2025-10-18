@@ -1,82 +1,140 @@
-import { NextResponse, type NextRequest } from "next/server"
-import { z } from "zod"
+// app/api/session/login/route.ts
+import { NextRequest, NextResponse } from "next/server"
 
-export const dynamic = "force-dynamic"
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8082/api"
 
-const LoginSchema = z.object({
-    email: z.string().email("Email inválido"),
-    password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
-})
-
+// join simples que evita // duplos
 function joinUrl(base: string, path: string) {
-    const b = (base || "").replace(/\/+$/, "")
-    const p = (path || "").replace(/^\/+/, "")
-    return `${b}/${p}`
+    return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
 }
 
-function stripBearer(t?: string) {
-    return (t || "").replace(/^Bearer\s+/i, "")
-}
-
-/**
- * POST /api/session/login
- * Autentica no backend e seta cookie HttpOnly "access_token"
- */
 export async function POST(req: NextRequest) {
+    const loginPath = "/auth/login"
+    const directUrl = joinUrl(API_BASE_URL, loginPath)
+    const bffUrl = new URL(loginPath, req.nextUrl.origin).toString()
+
+    let body: any
     try {
-        const { email, password } = LoginSchema.parse(await req.json())
+        body = await req.json()
+    } catch {
+        return NextResponse.json(
+            { ok: false, message: "JSON inválido" },
+            { status: 400 }
+        )
+    }
 
-        const base = process.env.API_BASE_URL || ""
-        if (!base) {
-            return NextResponse.json({ message: "API_BASE_URL ausente" }, { status: 500 })
-        }
+    // Nunca logar senha em claro
+    const safeBody = {
+        ...body,
+        password: body?.password ? "***" : undefined,
+    }
 
-        // Se base termina com /api → "auth/login"; senão → "api/auth/login"
-        const loginPath = base.endsWith("/api") ? "auth/login" : "api/auth/login"
-        const url = joinUrl(base, loginPath)
+    let direct: { status?: number; data?: any } | undefined
+    let viaBff: { status?: number; data?: any } | undefined
 
-        const upstream = await fetch(url, {
+    try {
+        // 1) Tenta direto no backend (diagnóstico)
+        const r1 = await fetch(directUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             cache: "no-store",
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify(body),
         })
 
-        if (!upstream.ok) {
-            let detail: any = null
-            try { detail = await upstream.json() } catch {}
-            const status = upstream.status || 500
-            const message =
-                detail?.message || (status === 401 ? "Credenciais inválidas." : "Falha ao autenticar.")
-            return NextResponse.json({ ok: false, status, message, detail }, { status })
+        let data1: any = null
+        try {
+            data1 = await r1.clone().json()
+        } catch {
+            // pode não ser JSON; ignoramos
         }
+        direct = { status: r1.status, data: data1 }
 
-        const data: any = await upstream.json()
-        const raw = data?.token || data?.accessToken || data?.jwt || data?.jwtToken || ""
-        const token = stripBearer(raw)
+        // Log antes do return (como pedido)
+        console.log("[LoginDebug] direct", {
+            url: directUrl,
+            status: direct.status,
+            data: direct.data,
+            body: safeBody,
+        })
 
-        if (!token || token.length < 10) {
-            return NextResponse.json(
-                { ok: false, message: "Backend não retornou { token } válido.", detail: data },
-                { status: 502 }
+        // Se o direto funcionou, retorna já com headers de diagnóstico
+        if (r1.ok) {
+            const res = NextResponse.json(
+                { ok: true, ...(data1 ?? {}) },
+                {
+                    status: r1.status,
+                    headers: {
+                        "x-login-direct-url": directUrl,
+                        "x-login-direct-status": String(r1.status),
+                        "x-login-bff-url": bffUrl,
+                        "x-login-bff-status": "skipped",
+                    },
+                }
             )
+            return res
         }
-
-        const isProd = process.env.NODE_ENV === "production"
-        const res = NextResponse.json({ ok: true })
-        res.cookies.set("access_token", token, {
-            httpOnly: true,
-            secure: isProd,
-            sameSite: "lax",
-            path: "/",
-            maxAge: 60 * 60 * 24 * 7, // 7 dias
+    } catch (e: any) {
+        console.error("[LoginDebug] direct fetch failed", {
+            url: directUrl,
+            error: e?.message,
         })
-        return res
-    } catch (err: any) {
-        if (err?.name === "ZodError") {
-            return NextResponse.json({ message: "Dados inválidos", errors: err.errors }, { status: 400 })
+    }
+
+    // 2) Se falhar/401 no direto, tenta via BFF local (/api/auth/login)
+    try {
+        const r2 = await fetch(bffUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify(body),
+        })
+
+        let data2: any = null
+        try {
+            data2 = await r2.clone().json()
+        } catch {
+            // pode não ser JSON
         }
-        console.error("[Login Error]", err)
-        return NextResponse.json({ message: "Erro ao fazer login", error: err?.message }, { status: 500 })
+        viaBff = { status: r2.status, data: data2 }
+
+        // Log antes do return (como pedido)
+        console.log("[LoginDebug] bff", {
+            url: bffUrl,
+            status: viaBff.status,
+            data: viaBff.data,
+            body: safeBody,
+        })
+
+        // Sempre devolvemos os headers x-login-* para você debugar pelo Network
+        const res = NextResponse.json(
+            data2 ?? { ok: r2.ok },
+            {
+                status: r2.status,
+                headers: {
+                    "x-login-direct-url": directUrl,
+                    "x-login-direct-status": String(direct?.status ?? 0),
+                    "x-login-bff-url": bffUrl,
+                    "x-login-bff-status": String(r2.status),
+                },
+            }
+        )
+        return res
+    } catch (e: any) {
+        console.error("[LoginDebug] bff fetch failed", {
+            url: bffUrl,
+            error: e?.message,
+        })
+        return NextResponse.json(
+            { ok: false, message: "Login via BFF falhou", error: e?.message },
+            {
+                status: 500,
+                headers: {
+                    "x-login-direct-url": directUrl,
+                    "x-login-direct-status": String(direct?.status ?? 0),
+                    "x-login-bff-url": bffUrl,
+                    "x-login-bff-status": "fetch_failed",
+                },
+            }
+        )
     }
 }
