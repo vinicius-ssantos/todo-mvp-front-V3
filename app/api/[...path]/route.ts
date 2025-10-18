@@ -27,7 +27,7 @@ async function handleRequest(req: NextRequest) {
         const search = req.nextUrl.searchParams.toString()
         const upstreamUrl = joinUrl(base, localPath, search)
 
-        // Clona e limpa headers que não fazem sentido em server-to-server
+        // Clona e limpa headers “de navegador”
         const headers = new Headers(req.headers)
         ;[
             "host",
@@ -46,6 +46,7 @@ async function handleRequest(req: NextRequest) {
             "x-forwarded-proto",
         ].forEach((h) => headers.delete(h))
 
+        // Injeta Authorization em rotas NÃO-auth
         const cookieToken = stripBearer(req.cookies.get("access_token")?.value)
         const useAuth = Boolean(cookieToken) && !isAuthPath(localPath)
         if (useAuth) {
@@ -68,7 +69,9 @@ async function handleRequest(req: NextRequest) {
             headers.delete("content-type")
         }
 
-        const upstream = await fetch(upstreamUrl, { method, headers, body, cache: "no-store" })
+        const upstream = await fetch(upstreamUrl, {
+            method, headers, body, cache: "no-store",
+        })
 
         const resHeaders = new Headers(upstream.headers)
         resHeaders.set("Access-Control-Allow-Origin", "*")

@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server"
 
-/**
- * POST /api/session/logout
- * Clears the access token cookie
- */
-export async function POST() {
-  const res = NextResponse.json({ ok: true, message: "Logout realizado com sucesso" })
+export const dynamic = "force-dynamic"
 
-  // Clear the access token cookie
+export async function POST() {
+  const res = NextResponse.json({ ok: true })
+  // apaga o cookie
   res.cookies.set("access_token", "", {
     httpOnly: true,
+    sameSite: "lax",
     path: "/",
-    maxAge: 0, // Expire immediately
+    maxAge: 0,
   })
-
   return res
 }
