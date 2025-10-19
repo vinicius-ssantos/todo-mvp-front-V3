@@ -77,7 +77,13 @@ export function TaskTable({ listId }: TaskTableProps) {
               </h3>
               <div className="space-y-2">
                 {pendingTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} />
+                  <TaskRow
+                    key={task.id}
+                    listId={listId}
+                    task={task}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             </div>
@@ -90,7 +96,13 @@ export function TaskTable({ listId }: TaskTableProps) {
               </h3>
               <div className="space-y-2">
                 {completedTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} />
+                  <TaskRow
+                    key={task.id}
+                    listId={listId}
+                    task={task}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             </div>
