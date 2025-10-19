@@ -1,90 +1,90 @@
 // app/api/[...path]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8082'
+// Garanta que sua base já inclua /api
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8082/api'
 
-/**
- * Proxy genérico do BFF:
- * - Encaminha /api/** para ${API_BASE_URL}/**
- * - Mantém método, querystring, body e headers relevantes
- * - NÃO adiciona credenciais por padrão; ajuste se necessário
- */
+// Cabeçalhos hop-by-hop não devem ser repassados
+const HOP_BY_HOP = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'host',
+  'content-length',
+])
 
-async function proxy(req: NextRequest, params: { path?: string[] }) {
-  const pathSegs = params.path ?? []
-  // monta URL alvo preservando querystring
-  const incomingUrl = new URL(req.url)
-  const target = new URL(`${API_BASE_URL}/${pathSegs.join('/')}`)
-  target.search = incomingUrl.search
-
-  const hopByHopHeaders = new Set([
-    'connection',
-    'keep-alive',
-    'proxy-authenticate',
-    'proxy-authorization',
-    'te',
-    'trailer',
-    'transfer-encoding',
-    'upgrade',
-  ])
-
-  // Copia headers úteis
-  const outHeaders = new Headers()
-  req.headers.forEach((value, key) => {
-    if (!hopByHopHeaders.has(key.toLowerCase())) {
-      // Normaliza Host na origem do backend
-      if (key.toLowerCase() === 'host') return
-      outHeaders.set(key, value)
-    }
+function pickForwardHeaders(inHeaders: Headers) {
+  const out = new Headers()
+  inHeaders.forEach((v, k) => {
+    if (!HOP_BY_HOP.has(k.toLowerCase())) out.set(k, v)
   })
+  // força Accept padrão se não vier
+  if (!out.has('accept')) out.set('accept', 'application/json, */*;q=0.1')
+  return out
+}
 
-  // Opcional: extrair token de cookie e enviar em Authorization
-  const token =
-    req.cookies.get('token')?.value ||
-    req.cookies.get('access_token')?.value ||
-    req.cookies.get('Authorization')?.value
+type Ctx = { params: Promise<{ path?: string[] }> }
 
-  if (token && !outHeaders.has('authorization')) {
-    outHeaders.set('authorization', token.startsWith('Bearer ') ? token : `Bearer ${token}`)
+async function proxy(req: NextRequest, ctx: Ctx) {
+  // (1) params precisa ser awaited
+  const { path = [] } = await ctx.params
+
+  // monta URL alvo preservando a querystring original
+  const incoming = new URL(req.url)
+  const target = new URL(`${API_BASE_URL}/${path.join('/')}`)
+  target.search = incoming.search // mantém ?query=...
+
+  const method = req.method
+  const headers = pickForwardHeaders(req.headers)
+
+  // (2) lidar com body sem stream (evita 'duplex: half')
+  let body: string | undefined
+  if (!['GET', 'HEAD'].includes(method)) {
+    const ct = headers.get('content-type') || ''
+    if (ct.includes('application/json')) {
+      const txt = await req.text()
+      body = txt // repassa string JSON
+      // Garante content-type coerente
+      headers.set('content-type', 'application/json; charset=utf-8')
+    } else if (ct.includes('application/x-www-form-urlencoded')) {
+      body = await req.text()
+    } else if (ct.includes('text/')) {
+      body = await req.text()
+    } else {
+      // fallback simples; se precisar multipart, tratar com FormData mais tarde
+      body = await req.text()
+    }
   }
 
-  // Lida com body (inclui JSON e multipart)
-  const method = req.method
-  const hasBody = !['GET', 'HEAD'].includes(method)
-  const body = hasBody ? req.body : undefined
-
-  const res = await fetch(target, {
+  const backendRes = await fetch(target, {
     method,
-    headers: outHeaders,
+    headers,
     body,
-    // O modo "manual" evita que redirects do backend virem HTML inesperado aqui
+    // evitar caches entre proxy e backend durante dev
+    cache: 'no-store',
     redirect: 'manual',
-    // Importante no Next 15 (Edge/Node), deixe o runtime default (Node) para manter streaming de body
   })
 
-  // Replica resposta (status/headers/body)
-  const resHeaders = new Headers()
-  res.headers.forEach((value, key) => {
-    if (!hopByHopHeaders.has(key.toLowerCase())) {
-      resHeaders.set(key, value)
-    }
-  })
+  // copia headers de resposta (removendo os proibidos)
+  const respHeaders = new Headers(backendRes.headers)
+  ;['content-encoding', 'content-length', 'connection'].forEach(h => respHeaders.delete(h))
 
-  return new NextResponse(res.body, {
-    status: res.status,
-    headers: resHeaders,
+  return new NextResponse(backendRes.body, {
+    status: backendRes.status,
+    headers: respHeaders,
   })
 }
 
-export const GET = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
-  proxy(req, params)
-export const HEAD = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
-  proxy(req, params)
-export const POST = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
-  proxy(req, params)
-export const PUT = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
-  proxy(req, params)
-export const PATCH = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
-  proxy(req, params)
-export const DELETE = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
-  proxy(req, params)
+// Exporta handlers para todos os métodos
+export const GET = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
+export const HEAD = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
+export const POST = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
+export const PUT = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
+export const PATCH = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
+export const DELETE = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
+export const OPTIONS = (req: NextRequest, ctx: Ctx) => proxy(req, ctx)
