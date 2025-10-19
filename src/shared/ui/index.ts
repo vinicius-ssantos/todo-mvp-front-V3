@@ -6,4 +6,12 @@ export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 export { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 export { Badge } from "@/components/ui/badge"
 export { Spinner } from "@/components/ui/spinner"
+export { Textarea } from "@/components/ui/textarea"
+export {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 export { toast } from "sonner"
