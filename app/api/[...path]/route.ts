@@ -1,8 +1,8 @@
 // app/api/[...path]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-// Garanta que sua base já inclua /api
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8082/api'
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8082'
+const API_PATH_PREFIX = process.env.API_PATH_PREFIX ?? '/api/v1'
 
 // Cabeçalhos hop-by-hop não devem ser repassados
 const HOP_BY_HOP = new Set([
@@ -30,17 +30,41 @@ function pickForwardHeaders(inHeaders: Headers) {
 
 type Ctx = { params: Promise<{ path?: string[] }> }
 
+function buildTargetUrl(baseRaw: string, segments: string[]) {
+  const base = new URL(baseRaw)
+  const prefix = (API_PATH_PREFIX ?? '').trim()
+  const normalizedPrefix = prefix ? `/${prefix.replace(/^\/+|\/+$/g, '')}` : ''
+  const path = segments.filter(Boolean).join('/')
+  const joined = [normalizedPrefix, path].filter(Boolean).join('/')
+
+  const target = new URL(base.origin)
+  target.pathname = joined.replace(/\/\/+/g, '/')
+  return target
+}
+
 async function proxy(req: NextRequest, ctx: Ctx) {
   // (1) params precisa ser awaited
   const { path = [] } = await ctx.params
 
   // monta URL alvo preservando a querystring original
   const incoming = new URL(req.url)
-  const target = new URL(`${API_BASE_URL}/${path.join('/')}`)
+  const target = buildTargetUrl(API_BASE_URL, path)
   target.search = incoming.search // mantém ?query=...
 
   const method = req.method
   const headers = pickForwardHeaders(req.headers)
+
+  const rawToken =
+    req.cookies.get('token')?.value ||
+    req.cookies.get('access_token')?.value ||
+    req.cookies.get('Authorization')?.value ||
+    req.headers.get('Authorization') ||
+    req.headers.get('authorization')
+
+  if (rawToken) {
+    const bearer = rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`
+    headers.set('Authorization', bearer)
+  }
 
   // (2) lidar com body sem stream (evita 'duplex: half')
   let body: string | undefined

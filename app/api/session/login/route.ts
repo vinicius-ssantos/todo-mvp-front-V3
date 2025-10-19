@@ -8,6 +8,24 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8082'
 // - ou manter base sem /api e usar /api/auth/login abaixo
 const LOGIN_PATH = process.env.LOGIN_PATH || '/api/auth/login'
 
+function resolveBackendUrl(baseRaw: string, pathRaw: string) {
+  const base = new URL(baseRaw)
+  const basePath = base.pathname.replace(/\/$/, '')
+
+  let path = pathRaw?.trim() || ''
+  if (!path.startsWith('/')) {
+    path = `/${path}`
+  }
+
+  const hasBasePath = Boolean(basePath && basePath !== '/')
+  const combinedPath =
+    hasBasePath && !path.startsWith(basePath) ? `${basePath}${path}` : path
+
+  const url = new URL(base.origin)
+  url.pathname = combinedPath.replace(/\/\/+/g, '/')
+  return url.toString()
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
@@ -27,7 +45,8 @@ export async function POST(req: NextRequest) {
     // })
 
     // Opção B (direto no backend, controlado por env):
-    const res = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
+    const loginUrl = resolveBackendUrl(API_BASE_URL, LOGIN_PATH)
+    const res = await fetch(loginUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
