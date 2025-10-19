@@ -49,7 +49,6 @@ export default function ListDetailPage() {
               <ListTodo className="h-6 w-6 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold">{list.name}</h1>
-                {list.description && <p className="text-sm text-muted-foreground">{list.description}</p>}
               </div>
             </div>
           </div>

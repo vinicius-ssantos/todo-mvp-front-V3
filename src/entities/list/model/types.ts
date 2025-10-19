@@ -1,6 +1,8 @@
 /**
  * List entity types
  */
+import type { Task } from "@/entities/task/model/types"
+
 export interface List {
   id: string
   name: string
@@ -14,5 +16,5 @@ export interface List {
 }
 
 export interface ListDetail extends List {
-  description?: string
+  tasks: Task[]
 }

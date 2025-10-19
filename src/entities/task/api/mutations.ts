@@ -1,18 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { http } from "@/shared/api"
-import { taskSchema } from "../model/schemas"
+import { backendTaskSchema, mapTaskFromApi } from "../model/schemas"
 import { listKeys } from "@/entities/list/api/queries"
 import type { Task } from "../model/types"
+
+const STATUS_DONE = "DONE"
+const STATUS_OPEN = "OPEN"
 
 /**
  * Create a new task
  */
-export async function createTask(listId: string, data: { title: string; description?: string }): Promise<Task> {
+export async function createTask(listId: string, data: { title: string }): Promise<Task> {
   const response = await http(`/api/lists/${listId}/tasks`, {
     method: "POST",
-    json: data,
+    json: { title: data.title, status: STATUS_OPEN },
   })
-  return taskSchema.parse(response)
+  const parsed = backendTaskSchema.parse(response)
+  return mapTaskFromApi(parsed, listId)
 }
 
 /**
@@ -22,7 +26,7 @@ export function useCreateTask(listId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: { title: string; description?: string }) => createTask(listId, data),
+    mutationFn: (data: { title: string }) => createTask(listId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId) })
       queryClient.invalidateQueries({ queryKey: listKeys.all })
@@ -33,12 +37,12 @@ export function useCreateTask(listId: string) {
 /**
  * Toggle task completion status
  */
-export async function toggleTask(listId: string, taskId: string, completed: boolean): Promise<Task> {
-  const data = await http(`/api/lists/${listId}/tasks/${taskId}`, {
+export async function toggleTask(listId: string, taskId: string, completed: boolean): Promise<void> {
+  const nextStatus = completed ? STATUS_DONE : STATUS_OPEN
+  await http(`/api/lists/${listId}/tasks/${taskId}`, {
     method: "PATCH",
-    json: { completed },
+    json: { status: nextStatus },
   })
-  return taskSchema.parse(data)
 }
 
 /**
@@ -51,21 +55,21 @@ export function useToggleTask(listId: string) {
     mutationFn: ({ taskId, completed }: { taskId: string; completed: boolean }) =>
       toggleTask(listId, taskId, completed),
     onMutate: async ({ taskId, completed }) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: listKeys.tasks(listId) })
 
-      // Snapshot previous value
-      const previousTasks = queryClient.getQueryData(listKeys.tasks(listId))
+      const previousTasks = queryClient.getQueryData<Task[]>(listKeys.tasks(listId))
 
-      // Optimistically update
       queryClient.setQueryData<Task[]>(listKeys.tasks(listId), (old) =>
-        old?.map((task) => (task.id === taskId ? { ...task, completed } : task)),
+        old?.map((task) =>
+          task.id === taskId
+            ? { ...task, completed, status: completed ? STATUS_DONE : STATUS_OPEN }
+            : task,
+        ),
       )
 
       return { previousTasks }
     },
-    onError: (err, variables, context) => {
-      // Rollback on error
+    onError: (_err, _variables, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(listKeys.tasks(listId), context.previousTasks)
       }

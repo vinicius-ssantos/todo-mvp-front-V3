@@ -3,7 +3,7 @@ import { http, ApiError } from "@/shared/api"
 import { env } from "@/shared/env"
 import { listSchema } from "../model/schemas"
 import { listKeys } from "./queries"
-import type { List } from "../model/types"
+import type { List, ListDetail } from "../model/types"
 
 /**
  * Create a new list
@@ -74,7 +74,7 @@ export function useRenameList() {
 
       // Snapshot previous values
       const previousLists = queryClient.getQueryData(listKeys.all)
-      const previousDetail = queryClient.getQueryData(listKeys.detail(id))
+      const previousDetail = queryClient.getQueryData<ListDetail | undefined>(listKeys.detail(id))
 
       // Optimistically update lists
       queryClient.setQueryData<List[]>(listKeys.all, (old) =>
@@ -82,7 +82,7 @@ export function useRenameList() {
       )
 
       // Optimistically update detail
-      queryClient.setQueryData<List>(listKeys.detail(id), (old) => (old ? { ...old, name } : old))
+      queryClient.setQueryData<ListDetail | undefined>(listKeys.detail(id), (old) => (old ? { ...old, name } : old))
 
       return { previousLists, previousDetail }
     },
