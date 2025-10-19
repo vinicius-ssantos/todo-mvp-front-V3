@@ -34,26 +34,24 @@ export function useCreateList() {
 /**
  * Rename a list (tries PUT first, falls back to PATCH if needed)
  */
-export async function renameList(id: string, name: string): Promise<List> {
+export async function renameList(id: string, name: string): Promise<void> {
   const usePatch = env.NEXT_PUBLIC_USE_PATCH
 
   try {
     // Try PUT first (unless explicitly configured to use PATCH)
     const method = usePatch ? "PATCH" : "PUT"
-    const data = await http(`/api/lists/${id}`, {
+    await http(`/api/lists/${id}`, {
       method,
       json: { name },
     })
-    return listSchema.parse(data)
   } catch (error) {
     // If PUT fails with 405 (Method Not Allowed), try PATCH
     if (error instanceof ApiError && error.status === 405 && !usePatch) {
       console.log("[Rename List] PUT not supported, falling back to PATCH")
-      const data = await http(`/api/lists/${id}`, {
+      await http(`/api/lists/${id}`, {
         method: "PATCH",
         json: { name },
       })
-      return listSchema.parse(data)
     }
     throw error
   }
