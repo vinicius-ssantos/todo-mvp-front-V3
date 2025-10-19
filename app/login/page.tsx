@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, toast } from "@/shared/ui"
 import { http, ApiError } from "@/shared/api"
 import { ListTodo } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
+import { listKeys } from "@/entities/list/api/queries"
 
 const loginFormSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -22,6 +24,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get("next") || "/"
+  const queryClient = useQueryClient()
 
   const {
     register,
@@ -37,6 +40,8 @@ export default function LoginPage() {
         method: "POST",
         json: data,
       })
+
+      queryClient.invalidateQueries({ queryKey: listKeys.all }).catch(() => {})
 
       toast.success("Login realizado com sucesso!")
       router.replace(next)

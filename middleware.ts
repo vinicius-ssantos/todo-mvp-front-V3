@@ -9,7 +9,6 @@ import { NextResponse } from 'next/server'
  * - Assets do Next e favicon
  */
 const PUBLIC_PATHS: RegExp[] = [
-  /^\/$/,                    // home pública? (ajuste se quiser proteger)
   /^\/login$/,
   /^\/register$/,
   /^\/api\/auth(\/.*)?$/,    // BFF pra AUTH do backend

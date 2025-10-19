@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server"
 export const dynamic = "force-dynamic"
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("access_token")?.value
+  const token =
+    req.cookies.get("token")?.value ??
+    req.cookies.get("access_token")?.value
+
   if (!token) return NextResponse.json({ ok: false, message: "Sem token" }, { status: 401 })
   // decode base64url (apenas debug local, sem validar assinatura)
   const [h, p] = token.split(".")

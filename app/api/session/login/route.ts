@@ -1,30 +1,13 @@
 // app/api/session/login/route.ts
 import { cookies } from 'next/headers'
 import { NextResponse, NextRequest } from 'next/server'
+import { resolveBackendUrl } from '../../_utils'
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8082'
 // Se no seu backend as rotas são /api/auth/login, você pode:
 // - pôr API_BASE_URL=http://localhost:8082/api e usar /auth/login
 // - ou manter base sem /api e usar /api/auth/login abaixo
 const LOGIN_PATH = process.env.LOGIN_PATH || '/api/auth/login'
-
-function resolveBackendUrl(baseRaw: string, pathRaw: string) {
-  const base = new URL(baseRaw)
-  const basePath = base.pathname.replace(/\/$/, '')
-
-  let path = pathRaw?.trim() || ''
-  if (!path.startsWith('/')) {
-    path = `/${path}`
-  }
-
-  const hasBasePath = Boolean(basePath && basePath !== '/')
-  const combinedPath =
-    hasBasePath && !path.startsWith(basePath) ? `${basePath}${path}` : path
-
-  const url = new URL(base.origin)
-  url.pathname = combinedPath.replace(/\/\/+/g, '/')
-  return url.toString()
-}
 
 export async function POST(req: NextRequest) {
   try {

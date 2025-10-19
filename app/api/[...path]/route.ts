@@ -1,6 +1,7 @@
 // app/api/[...path]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
+// Configure o host base e (opcionalmente) o prefixo da API via .env.local.
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8082'
 const API_PATH_PREFIX = process.env.API_PATH_PREFIX ?? '/api/v1'
 
