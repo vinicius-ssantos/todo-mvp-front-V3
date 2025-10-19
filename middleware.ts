@@ -1,40 +1,61 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 
 /**
- * Protege rotas privadas e evita acessar /login já autenticado
+ * Rotas públicas:
+ * - Páginas públicas /login e /register
+ * - BFF público de auth: /api/auth/**
+ * - (opcional) alias /auth/**, caso exista no projeto
+ * - Assets do Next e favicon
  */
-export function middleware(req: NextRequest) {
-    const { pathname } = req.nextUrl
+const PUBLIC_PATHS: RegExp[] = [
+  /^\/$/,                    // home pública? (ajuste se quiser proteger)
+  /^\/login$/,
+  /^\/register$/,
+  /^\/api\/auth(\/.*)?$/,    // BFF pra AUTH do backend
+  /^\/auth(\/.*)?$/,         // alias opcional; se não usa, pode remover
+  /^\/_next\/.*/,
+  /^\/favicon\.ico$/,
+]
 
-    const publicPaths = ["/login", "/register"]
-    const isPublic = publicPaths.some((p) => pathname.startsWith(p))
-
-    const token = req.cookies.get("access_token")?.value
-
-    // Já logado → evita /login e /register
-    if (isPublic && token) {
-        const url = req.nextUrl.clone()
-        url.pathname = "/"
-        return NextResponse.redirect(url)
-    }
-
-    // Protege rotas privadas quando não há token
-    const isSessionApi = pathname.startsWith("/api/session")
-    const isStatic = pathname.startsWith("/_next") || pathname.startsWith("/public")
-    if (!isPublic && !isSessionApi && !isStatic && !token) {
-        const url = req.nextUrl.clone()
-        url.pathname = "/login"
-        url.searchParams.set("next", pathname)
-        return NextResponse.redirect(url)
-    }
-
-    return NextResponse.next()
+function isPublic(pathname: string) {
+  return PUBLIC_PATHS.some((re) => re.test(pathname))
 }
 
+export function middleware(req: NextRequest) {
+  const { pathname, search } = req.nextUrl
+  // Deixe passar tudo que for público
+  if (isPublic(pathname)) {
+    return NextResponse.next()
+  }
+
+  // Verifique presença de sessão (ajuste o nome do cookie se necessário)
+  const token =
+    req.cookies.get('token')?.value ||
+    req.cookies.get('access_token')?.value ||
+    req.cookies.get('Authorization')?.value
+
+  // Sem token? redireciona para /login preservando "next"
+  if (!token) {
+    const url = req.nextUrl.clone()
+    url.pathname = '/login'
+    url.search = `?next=${encodeURIComponent(pathname + (search || ''))}`
+    return NextResponse.redirect(url)
+  }
+
+  return NextResponse.next()
+}
+
+/**
+ * IMPORTANTÍSSIMO:
+ * Não rode o middleware em:
+ * - /api/** (inclui o BFF e evita interceptar POSTs de API)
+ * - /auth/** (se você mantém um alias sem /api)
+ * - assets estáticos
+ */
 export const config = {
-    matcher: [
-        // tudo exceto assets estáticos e as rotas de sessão
-        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/session).*)",
-    ],
+  matcher: [
+    // tudo exceto api/, auth/, _next/ e favicon
+    '/((?!api/|auth/|_next/|favicon\\.ico).*)',
+  ],
 }

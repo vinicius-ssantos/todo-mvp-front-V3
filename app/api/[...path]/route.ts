@@ -1,113 +1,90 @@
 // app/api/[...path]/route.ts
-import { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
 
-export const dynamic = "force-dynamic"
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8082'
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8082/api"
+/**
+ * Proxy genérico do BFF:
+ * - Encaminha /api/** para ${API_BASE_URL}/**
+ * - Mantém método, querystring, body e headers relevantes
+ * - NÃO adiciona credenciais por padrão; ajuste se necessário
+ */
 
-function joinUrl(base: string, path: string) {
-  return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
-}
+async function proxy(req: NextRequest, params: { path?: string[] }) {
+  const pathSegs = params.path ?? []
+  // monta URL alvo preservando querystring
+  const incomingUrl = new URL(req.url)
+  const target = new URL(`${API_BASE_URL}/${pathSegs.join('/')}`)
+  target.search = incomingUrl.search
 
-function isAuthPath(localPath: string) {
-  const p = localPath.replace(/^\/+/, "")
-  return /(^|\/)auth\//i.test(p)
-}
+  const hopByHopHeaders = new Set([
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade',
+  ])
 
-async function proxy(req: NextRequest) {
-  const { pathname, search } = req.nextUrl
-  const localPath = pathname.replace(/^\/api\/?/, "")
-  const upstreamUrl = joinUrl(API_BASE_URL, localPath) + (search || "")
-  const method = req.method.toUpperCase()
-
-  // Copia headers base
-  const headers = new Headers(req.headers)
-  headers.delete("host")
-  headers.delete("connection")
-  headers.delete("accept-encoding")
-  headers.delete("content-length")
-
-  const cookieToken = req.cookies.get("access_token")?.value
-  const useAuth = !!cookieToken && !isAuthPath(localPath)
-
-  if (useAuth) {
-    headers.set("authorization", `Bearer ${cookieToken}`)
-  } else {
-    headers.delete("authorization")
-  }
-
-  // Corpo: para JSON, materializa em texto (evita stream bug); senão, repassa stream
-  const hasBody = !["GET", "HEAD"].includes(method)
-  let upstreamBody: BodyInit | undefined = undefined
-
-  if (hasBody) {
-    const ct = headers.get("content-type") || ""
-    if (ct.includes("application/json")) {
-      const text = await req.text() // materializa
-      upstreamBody = text
-    } else {
-      // fallback para stream (ex.: multipart)
-      // @ts-expect-error Node fetch aceita duplex
-      upstreamBody = req.body as any
-    }
-  }
-
-  console.log("[BFF->Upstream]", {
-    method, upstreamUrl, useAuth, hasAuthHeader: headers.has("authorization"),
-  })
-
-  let upstream: Response
-  try {
-    upstream = await fetch(upstreamUrl, {
-      method,
-      headers,
-      cache: "no-store",
-      // @ts-expect-error Node fetch aceita duplex
-      duplex: hasBody ? "half" : undefined,
-      body: upstreamBody,
-    })
-  } catch (e: any) {
-    console.error("[BFF error] fetch failed", { upstreamUrl, error: e?.message })
-    return new Response(
-      JSON.stringify({ ok: false, message: "Upstream indisponível", error: e?.message }),
-      {
-        status: 502,
-        headers: {
-          "content-type": "application/json",
-          "x-bff-upstream-url": upstreamUrl,
-        },
-      }
-    )
-  }
-
-  // === MATERIALIZA A RESPOSTA DO UPSTREAM ===
-  const buf = await upstream.arrayBuffer()
-  const ct = upstream.headers.get("content-type") ?? "application/json"
-
-  // Reconstroi headers essenciais + repassa Set-Cookie (se houver)
+  // Copia headers úteis
   const outHeaders = new Headers()
-  outHeaders.set("content-type", ct)
-  outHeaders.set("x-bff-upstream-url", upstreamUrl)
-  // Repassa cookies múltiplos
-  const setCookies = upstream.headers.getSetCookie?.() as string[] | undefined
-  if (Array.isArray(setCookies)) {
-    for (const sc of setCookies) outHeaders.append("set-cookie", sc)
-  } else {
-    const sc = upstream.headers.get("set-cookie")
-    if (sc) outHeaders.append("set-cookie", sc)
+  req.headers.forEach((value, key) => {
+    if (!hopByHopHeaders.has(key.toLowerCase())) {
+      // Normaliza Host na origem do backend
+      if (key.toLowerCase() === 'host') return
+      outHeaders.set(key, value)
+    }
+  })
+
+  // Opcional: extrair token de cookie e enviar em Authorization
+  const token =
+    req.cookies.get('token')?.value ||
+    req.cookies.get('access_token')?.value ||
+    req.cookies.get('Authorization')?.value
+
+  if (token && !outHeaders.has('authorization')) {
+    outHeaders.set('authorization', token.startsWith('Bearer ') ? token : `Bearer ${token}`)
   }
 
-  console.log("[BFF<-Upstream]", { status: upstream.status, upstreamUrl, bytes: buf.byteLength })
+  // Lida com body (inclui JSON e multipart)
+  const method = req.method
+  const hasBody = !['GET', 'HEAD'].includes(method)
+  const body = hasBody ? req.body : undefined
 
-  return new Response(buf, {
-    status: upstream.status,
+  const res = await fetch(target, {
+    method,
     headers: outHeaders,
+    body,
+    // O modo "manual" evita que redirects do backend virem HTML inesperado aqui
+    redirect: 'manual',
+    // Importante no Next 15 (Edge/Node), deixe o runtime default (Node) para manter streaming de body
+  })
+
+  // Replica resposta (status/headers/body)
+  const resHeaders = new Headers()
+  res.headers.forEach((value, key) => {
+    if (!hopByHopHeaders.has(key.toLowerCase())) {
+      resHeaders.set(key, value)
+    }
+  })
+
+  return new NextResponse(res.body, {
+    status: res.status,
+    headers: resHeaders,
   })
 }
 
-export const GET = proxy
-export const POST = proxy
-export const PUT = proxy
-export const PATCH = proxy
-export const DELETE = proxy
-export const OPTIONS = proxy
+export const GET = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
+  proxy(req, params)
+export const HEAD = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
+  proxy(req, params)
+export const POST = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
+  proxy(req, params)
+export const PUT = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
+  proxy(req, params)
+export const PATCH = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
+  proxy(req, params)
+export const DELETE = (req: NextRequest, { params }: { params: { path?: string[] } }) =>
+  proxy(req, params)

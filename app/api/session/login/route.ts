@@ -1,128 +1,99 @@
 // app/api/session/login/route.ts
-import { NextRequest, NextResponse } from "next/server"
+import { cookies } from 'next/headers'
+import { NextResponse, NextRequest } from 'next/server'
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8082/api"
-
-function joinUrl(base: string, path: string) {
-    return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
-}
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8082'
+// Se no seu backend as rotas são /api/auth/login, você pode:
+// - pôr API_BASE_URL=http://localhost:8082/api e usar /auth/login
+// - ou manter base sem /api e usar /api/auth/login abaixo
+const LOGIN_PATH = process.env.LOGIN_PATH || '/api/auth/login'
 
 export async function POST(req: NextRequest) {
-    const loginPath = "/auth/login"
-    const directUrl = joinUrl(API_BASE_URL, loginPath)
-    const bffUrl = new URL(loginPath, req.nextUrl.origin).toString()
+  try {
+    const { email, password } = await req.json()
 
-    let body: any
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'missing_fields', message: 'Email e senha são obrigatórios' },
+        { status: 400 }
+      )
+    }
+
+    // Opção A (via BFF no mesmo domínio):
+    // const res = await fetch(`${new URL('/api/auth/login', req.url).toString()}`, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ email, password }),
+    // })
+
+    // Opção B (direto no backend, controlado por env):
+    const res = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      redirect: 'manual',
+    })
+
+    const text = await res.text()
+    let payload: any = {}
     try {
-        body = await req.json()
+      payload = text ? JSON.parse(text) : {}
     } catch {
-        return NextResponse.json({ ok: false, message: "JSON inválido" }, { status: 400 })
+      // se não for JSON, mantém como string para debug
+      payload = { raw: text }
     }
 
-    const safeBody = { ...body, password: body?.password ? "***" : undefined }
-
-    // --- 1) Tenta DIRETO no backend (diagnóstico)
-    let directStatus = 0
-    try {
-        const r1 = await fetch(directUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            cache: "no-store",
-            body: JSON.stringify(body),
-        })
-        directStatus = r1.status
-        let data1: any = null
-        let text1: string | undefined
-
-        try { data1 = await r1.clone().json() } catch { /* pode não ser json */ }
-        try { text1 = await r1.clone().text() } catch {}
-
-        console.log("[LoginDebug] direct", {
-            url: directUrl, status: r1.status, data: data1, text: text1, body: safeBody,
-        })
-
-        if (r1.ok && data1?.token) {
-            // opcional: setar cookie da sessão aqui
-            return NextResponse.json(
-                { ok: true, token: data1.token },
-                {
-                    status: 200,
-                    headers: {
-                        "x-login-direct-url": directUrl,
-                        "x-login-direct-status": String(r1.status),
-                        "x-login-bff-url": bffUrl,
-                        "x-login-bff-status": "skipped",
-                        "x-login-final": "direct-200-token",
-                    },
-                }
-            )
-        }
-    } catch (e: any) {
-        console.error("[LoginDebug] direct fetch failed", { url: directUrl, error: e?.message })
+    if (!res.ok) {
+      return NextResponse.json(
+        {
+          error: payload?.error || 'login_failed',
+          message: payload?.message || 'Falha ao autenticar',
+          details: payload,
+        },
+        { status: res.status }
+      )
     }
 
-    // --- 2) Tenta VIA BFF (materializado)
-    try {
-        const r2 = await fetch(bffUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            cache: "no-store",
-            body: JSON.stringify(body),
-        })
+    // Tenta extrair token do JSON (ex.: {token:"..."} ou {accessToken:"..."}).
+    // Se seu backend devolve Authorization no header, também suportamos.
+    const headerAuth = res.headers.get('authorization') || res.headers.get('Authorization')
+    const tokenFromHeader = headerAuth && headerAuth.startsWith('Bearer ')
+      ? headerAuth
+      : undefined
 
-        let data2: any = null
-        let text2: string | undefined
-        try { data2 = await r2.clone().json() } catch {}
-        try { text2 = await r2.clone().text() } catch {}
+    const token =
+      tokenFromHeader ||
+      payload?.token ||
+      payload?.accessToken ||
+      (payload?.Authorization?.startsWith?.('Bearer ') ? payload.Authorization : undefined)
 
-        console.log("[LoginDebug] bff", {
-            url: bffUrl, status: r2.status, data: data2, text: text2, body: safeBody,
-        })
-
-        if (r2.ok && data2?.token) {
-            return NextResponse.json(
-                { ok: true, token: data2.token },
-                {
-                    status: 200,
-                    headers: {
-                        "x-login-direct-url": directUrl,
-                        "x-login-direct-status": String(directStatus || 0),
-                        "x-login-bff-url": bffUrl,
-                        "x-login-bff-status": String(r2.status),
-                        "x-login-final": "bff-200-token",
-                    },
-                }
-            )
-        }
-
-        // Se chegou aqui, BFF respondeu mas sem token
-        return NextResponse.json(
-            { ok: false, message: "Backend (via BFF) não retornou { token } válido.", detail: { data2, text2 } },
-            {
-                status: 502,
-                headers: {
-                    "x-login-direct-url": directUrl,
-                    "x-login-direct-status": String(directStatus || 0),
-                    "x-login-bff-url": bffUrl,
-                    "x-login-bff-status": String(r2.status),
-                    "x-login-final": "bff-200-no-token",
-                },
-            }
-        )
-    } catch (e: any) {
-        console.error("[LoginDebug] bff fetch failed", { url: bffUrl, error: e?.message })
-        return NextResponse.json(
-            { ok: false, message: "Login via BFF falhou", error: e?.message },
-            {
-                status: 500,
-                headers: {
-                    "x-login-direct-url": directUrl,
-                    "x-login-direct-status": String(directStatus || 0),
-                    "x-login-bff-url": bffUrl,
-                    "x-login-bff-status": "fetch_failed",
-                    "x-login-final": "bff-fetch-failed",
-                },
-            }
-        )
+    if (!token) {
+      return NextResponse.json(
+        {
+          error: 'missing_token',
+          message:
+            'Login retornou sucesso, mas não encontrei token na resposta. Ajuste o mapeamento.',
+          details: payload,
+        },
+        { status: 500 }
+      )
     }
+
+    // Grava cookie httpOnly
+    const cookieStore = await cookies()
+    cookieStore.set('token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 dias (ajuste)
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: 'unexpected', message: err?.message || 'Erro inesperado' },
+      { status: 500 }
+    )
+  }
 }
