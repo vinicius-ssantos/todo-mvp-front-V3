@@ -32,6 +32,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (!backendRes.ok) {
+      if (backendRes.status === 401 && payload?.error === 'invalid_token') {
+        return NextResponse.json(
+          {
+            error: 'email_conflict',
+            message: 'Já existe uma conta com este e-mail. Faça login ou use outro endereço.',
+            details: payload,
+          },
+          { status: 409 },
+        )
+      }
+
       return NextResponse.json(
         {
           error: payload?.error || 'register_failed',
