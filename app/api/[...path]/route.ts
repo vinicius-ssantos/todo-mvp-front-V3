@@ -5,12 +5,10 @@ export const dynamic = "force-dynamic"
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8082/api"
 
-// Junta respeitando barras
 function joinUrl(base: string, path: string) {
   return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
 }
 
-// Qualquer coisa sob /auth/** é rota pública de auth (não injeta Authorization)
 function isAuthPath(localPath: string) {
   const p = localPath.replace(/^\/+/, "")
   return /(^|\/)auth\//i.test(p)
@@ -18,18 +16,17 @@ function isAuthPath(localPath: string) {
 
 async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl
-  const localPath = pathname.replace(/^\/api\/?/, "") // tira o prefixo /api/
+  const localPath = pathname.replace(/^\/api\/?/, "")
   const upstreamUrl = joinUrl(API_BASE_URL, localPath) + (search || "")
-
   const method = req.method.toUpperCase()
 
-  // Copia headers úteis, removendo os que não fazem sentido para upstream
+  // Copia headers base
   const headers = new Headers(req.headers)
   headers.delete("host")
   headers.delete("connection")
   headers.delete("accept-encoding")
+  headers.delete("content-length")
 
-  // Controle de Authorization por cookie (ex.: access_token)
   const cookieToken = req.cookies.get("access_token")?.value
   const useAuth = !!cookieToken && !isAuthPath(localPath)
 
@@ -39,28 +36,36 @@ async function proxy(req: NextRequest) {
     headers.delete("authorization")
   }
 
-  // Logs ANTES do fetch (como pedido)
-  console.log("[BFF->Upstream]", {
-    method,
-    upstreamUrl,
-    useAuth,
-    hasAuthHeader: headers.has("authorization"),
-  })
-
-  // Pass-through de body (quando houver). Em Node 18+, para streaming, usar duplex: 'half'
+  // Corpo: para JSON, materializa em texto (evita stream bug); senão, repassa stream
   const hasBody = !["GET", "HEAD"].includes(method)
-  const init: RequestInit = {
-    method,
-    headers,
-    cache: "no-store",
-    // @ts-expect-error Node fetch aceita duplex
-    duplex: hasBody ? "half" : undefined,
-    body: hasBody ? req.body : undefined,
+  let upstreamBody: BodyInit | undefined = undefined
+
+  if (hasBody) {
+    const ct = headers.get("content-type") || ""
+    if (ct.includes("application/json")) {
+      const text = await req.text() // materializa
+      upstreamBody = text
+    } else {
+      // fallback para stream (ex.: multipart)
+      // @ts-expect-error Node fetch aceita duplex
+      upstreamBody = req.body as any
+    }
   }
+
+  console.log("[BFF->Upstream]", {
+    method, upstreamUrl, useAuth, hasAuthHeader: headers.has("authorization"),
+  })
 
   let upstream: Response
   try {
-    upstream = await fetch(upstreamUrl, init)
+    upstream = await fetch(upstreamUrl, {
+      method,
+      headers,
+      cache: "no-store",
+      // @ts-expect-error Node fetch aceita duplex
+      duplex: hasBody ? "half" : undefined,
+      body: upstreamBody,
+    })
   } catch (e: any) {
     console.error("[BFF error] fetch failed", { upstreamUrl, error: e?.message })
     return new Response(
@@ -75,28 +80,31 @@ async function proxy(req: NextRequest) {
     )
   }
 
-  // Logs DEPOIS do fetch (como pedido)
-  console.log("[BFF<-Upstream]", {
-    status: upstream.status,
-    upstreamUrl,
-  })
+  // === MATERIALIZA A RESPOSTA DO UPSTREAM ===
+  const buf = await upstream.arrayBuffer()
+  const ct = upstream.headers.get("content-type") ?? "application/json"
 
-  // Repasse de headers essenciais
-  const outHeaders = new Headers(upstream.headers)
+  // Reconstroi headers essenciais + repassa Set-Cookie (se houver)
+  const outHeaders = new Headers()
+  outHeaders.set("content-type", ct)
   outHeaders.set("x-bff-upstream-url", upstreamUrl)
+  // Repassa cookies múltiplos
+  const setCookies = upstream.headers.getSetCookie?.() as string[] | undefined
+  if (Array.isArray(setCookies)) {
+    for (const sc of setCookies) outHeaders.append("set-cookie", sc)
+  } else {
+    const sc = upstream.headers.get("set-cookie")
+    if (sc) outHeaders.append("set-cookie", sc)
+  }
 
-  // Evita problemas com encodings transfer-encoding/chunked
-  outHeaders.delete("content-encoding")
-  outHeaders.delete("transfer-encoding")
-  outHeaders.delete("content-length")
+  console.log("[BFF<-Upstream]", { status: upstream.status, upstreamUrl, bytes: buf.byteLength })
 
-  return new Response(upstream.body, {
+  return new Response(buf, {
     status: upstream.status,
     headers: outHeaders,
   })
 }
 
-// Exporta todos os métodos que você usa
 export const GET = proxy
 export const POST = proxy
 export const PUT = proxy
