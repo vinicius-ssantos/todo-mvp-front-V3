@@ -1,30 +1,35 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { SidebarLists } from "@/widgets/sidebar-lists"
-import { TaskTable } from "@/widgets/task-table"
-import { Button } from "@/shared/ui"
-import { http } from "@/shared/api"
-import { LogOut, ListTodo } from "lucide-react"
-import { toast } from "sonner"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { SidebarLists } from "@/widgets/sidebar-lists";
+import { TaskTable } from "@/widgets/task-table";
+import { FiltersBar } from "@/widgets/filters-bar";
+import { Button } from "@/shared/ui";
+import { http } from "@/shared/api";
+import { LogOut, ListTodo } from "lucide-react";
+import { toast } from "sonner";
 
 /**
  * Main dashboard page
  */
 export default function HomePage() {
-  const router = useRouter()
-  const [selectedListId, setSelectedListId] = useState<string | undefined>()
+  const router = useRouter();
+  const [selectedListId, setSelectedListId] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "overdue">("all");
+  const [search, setSearch] = useState("");
+
 
   const handleLogout = async () => {
     try {
-      await http("/api/session/logout", { method: "POST" })
-      toast.success("Logout realizado com sucesso!")
-      router.push("/login")
+      await http("/api/session/logout", { method: "POST" });
+      toast.success("Logout realizado com sucesso!");
+      router.push("/login");
     } catch (error) {
-      toast.error("Erro ao fazer logout")
+      toast.error("Erro ao fazer logout");
     }
-  }
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -37,7 +42,12 @@ export default function HomePage() {
             </div>
             <h1 className="text-xl font-bold">TodoList App</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2 bg-transparent">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLogout}
+            className="gap-2 bg-transparent"
+          >
             <LogOut className="h-4 w-4" />
             Sair
           </Button>
@@ -54,8 +64,19 @@ export default function HomePage() {
         {/* Main area */}
         <main className="flex-1 overflow-y-auto">
           {selectedListId ? (
-            <div className="max-w-4xl mx-auto p-6">
-              <TaskTable listId={selectedListId} />
+            <div className="max-w-4xl mx-auto p-6 space-y-4">
+              <FiltersBar
+                onFilterChange={setStatusFilter}
+                onSearchChange={setSearch}
+                dateFilter={dateFilter}
+                onDateFilterChange={setDateFilter}
+              />
+              <TaskTable
+                listId={selectedListId}
+                status={statusFilter}
+                date={dateFilter}
+                search={search}
+              />
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-center p-8">
@@ -71,5 +92,5 @@ export default function HomePage() {
         </main>
       </div>
     </div>
-  )
+  );
 }
