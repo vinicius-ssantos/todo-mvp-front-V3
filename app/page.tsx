@@ -73,9 +73,7 @@ export default function HomePage() {
               />
               <TaskTable
                 listId={selectedListId}
-                status={statusFilter}
                 date={dateFilter}
-                search={search}
               />
             </div>
           ) : (

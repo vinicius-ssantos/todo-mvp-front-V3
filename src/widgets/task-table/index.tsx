@@ -10,13 +10,14 @@ import { CheckCircle2 } from "lucide-react"
 
 interface TaskTableProps {
   listId: string
+  date?: "all" | "today" | "week" | "overdue"
 }
 
 /**
  * Widget to display and manage tasks for a list
  */
-export function TaskTable({ listId }: TaskTableProps) {
-  const { data: tasks, isLoading, error } = useListTasks(listId)
+export function TaskTable({ listId,date="all" }: TaskTableProps) {
+  const { data: tasks, isLoading, error } = useListTasks(listId,{date})
   const toggleTask = useToggleTask(listId)
   const deleteTask = useDeleteTask(listId)
 
