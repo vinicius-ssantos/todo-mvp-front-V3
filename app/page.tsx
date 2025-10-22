@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SidebarLists } from "@/widgets/sidebar-lists";
 import { TaskTable } from "@/widgets/task-table";
 import { FiltersBar } from "@/widgets/filters-bar";
@@ -19,6 +19,55 @@ export default function HomePage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "overdue">("all");
   const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  const setParams = useCallback((patch: Record<string, string | undefined>) => {
+    const qs = new URLSearchParams(searchParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (!v || v === "" || v === "all") qs.delete(k);
+      else qs.set(k, v);
+    }
+    const next = `${pathname}${qs.toString() ? `?${qs.toString()}` : ""}`;
+    router.replace(next);
+  }, [router, pathname, searchParams]);
+
+  // Sincroniza estado <- URL
+  useEffect(() => {
+    const sp = new URLSearchParams(searchParams.toString());
+    const list = sp.get("list") ?? undefined;
+    const status = sp.get("status");
+    const date = sp.get("date");
+    const q = sp.get("q") ?? "";
+
+    if (list !== undefined) setSelectedListId(list);
+    if (status === "pending" || status === "completed" || status === "all" || status === null) {
+      setStatusFilter(((status ?? "all") as unknown) as "all" | "pending" | "completed");
+    }
+    if (date === "today" || date === "week" || date === "overdue" || date === "all" || date === null) {
+      setDateFilter(((date ?? "all") as unknown) as "all" | "today" | "week" | "overdue");
+    }
+    setSearch(q);
+  }, [searchParams]);
+
+  // Handlers que atualizam estado -> URL
+  const handleSelectList = (id?: string) => {
+    setSelectedListId(id);
+    setParams({ list: id });
+  };
+  const handleStatusChange = (f: "all" | "pending" | "completed") => {
+    setStatusFilter(f);
+    setParams({ status: f });
+  };
+  const handleDateChange = (d: "all" | "today" | "week" | "overdue") => {
+    setDateFilter(d);
+    setParams({ date: d });
+  };
+  const handleSearchChange = (v: string) => {
+    setSearch(v);
+    setParams({ q: v });
+  };
+
 
 
   const handleLogout = async () => {
@@ -58,7 +107,7 @@ export default function HomePage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside className="w-80 border-r border-border bg-card overflow-hidden">
-          <SidebarLists selectedListId={selectedListId} onSelectList={setSelectedListId} />
+          <SidebarLists selectedListId={selectedListId} onSelectList={handleSelectList} />
         </aside>
 
         {/* Main area */}
@@ -66,14 +115,24 @@ export default function HomePage() {
           {selectedListId ? (
             <div className="max-w-4xl mx-auto p-6 space-y-4">
               <FiltersBar
-                onFilterChange={setStatusFilter}
-                onSearchChange={setSearch}
+                onFilterChange={handleStatusChange}
+                onSearchChange={handleSearchChange}
                 dateFilter={dateFilter}
-                onDateFilterChange={setDateFilter}
+                onDateFilterChange={handleDateChange}
               />
+              {(statusFilter !== "all" || dateFilter !== "all" || search) && (
+              <div className="text-sm text-muted-foreground">
+                Filtros ativos:
+                {statusFilter !== "all" && <> Status: {statusFilter}.</>}
+                {dateFilter !== "all" && <> Prazo: {dateFilter}.</>}
+                {search && <> Busca: “{search}”.</>}
+              </div>
+            )}
               <TaskTable
                 listId={selectedListId}
                 date={dateFilter}
+                status={statusFilter}
+                search={search}
               />
             </div>
           ) : (

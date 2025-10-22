@@ -5,17 +5,21 @@ import { backendTaskSchema, mapTaskFromApi } from "../model/schemas"
 import { listKeys } from "@/entities/list/api/queries"
 import type { Task } from "../model/types"
 
-type TaskFilters = { date?: "all" | "today" | "week" | "overdue" }
+export type TaskFilters = { date?: "all" | "today" | "week" | "overdue"; status?: "all" | "pending" | "completed"; search?: string }
 
 const listTasksResponseSchema = z.object({
   id: z.string().uuid(),
   tasks: z.array(backendTaskSchema).default([]),
 })
 
-/**
- * Fetch tasks for a list
- */
-
+const mapFiltersToParams = (f: TaskFilters) => {
+  const qs = new URLSearchParams()
+  if (f.date && f.date !== "all") qs.set("due", f.date)
+  if (f.status && f.status !== "all") qs.set("status", f.status === "pending" ? "OPEN" : "DONE")
+  if (f.search?.trim()) qs.set("q", f.search.trim())
+  const s = qs.toString()
+  return s ? `?${s}` : ""
+}
 
 export async function getListTasks(listId: string, filters?: TaskFilters): Promise<Task[]> {
     // por enquanto, mantém a mesma chamada
@@ -31,10 +35,10 @@ export async function getListTasks(listId: string, filters?: TaskFilters): Promi
 /**
  * Hook to fetch tasks for a list
  */
-export function useListTasks(listId: string,filters: TaskFilters = {}) {
-    const { date = "all" } = filters
+export function useListTasks(listId: string, filters: TaskFilters = {}) {
+    const { date = "all", status = "all", search = "" } = filters
     return useQuery({
-        queryKey: listKeys.tasks(listId).concat(["date", date]),
+        queryKey: [...listKeys.tasks(listId), "date", date, "status", status, "search", search],
         queryFn: () => getListTasks(listId, filters),
         enabled: !!listId,
     })
