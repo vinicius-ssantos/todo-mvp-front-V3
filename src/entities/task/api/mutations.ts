@@ -87,7 +87,7 @@ export function useCreateTask(listId: string) {
   return useMutation({
     mutationFn: (data: CreateTaskInput) => createTask(listId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId) })
+      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false })
       queryClient.invalidateQueries({ queryKey: listKeys.all })
     },
   })
@@ -116,7 +116,7 @@ export function useUpdateTask(listId: string) {
     mutationFn: ({ taskId, data }: { taskId: string; data: UpdateTaskInput }) =>
       updateTask(listId, taskId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId) })
+      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false })
       queryClient.invalidateQueries({ queryKey: listKeys.all })
     },
   })
@@ -163,7 +163,7 @@ export function useToggleTask(listId: string) {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId) })
+      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false })
       queryClient.invalidateQueries({ queryKey: listKeys.all })
     },
   })
@@ -187,7 +187,7 @@ export function useDeleteTask(listId: string) {
   return useMutation({
     mutationFn: (taskId: string) => deleteTask(listId, taskId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId) })
+      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false })
       queryClient.invalidateQueries({ queryKey: listKeys.all })
     },
   })

@@ -71,9 +71,19 @@ export default function HomePage() {
                 dateFilter={dateFilter}
                 onDateFilterChange={setDateFilter}
               />
+              {(statusFilter !== "all" || dateFilter !== "all" || search) && (
+              <div className="text-sm text-muted-foreground">
+                Filtros ativos:
+                {statusFilter !== "all" && <> Status: {statusFilter}.</>}
+                {dateFilter !== "all" && <> Prazo: {dateFilter}.</>}
+                {search && <> Busca: “{search}”.</>}
+              </div>
+            )}
               <TaskTable
                 listId={selectedListId}
                 date={dateFilter}
+                status={statusFilter}
+                search={search}
               />
             </div>
           ) : (

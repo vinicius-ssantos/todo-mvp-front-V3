@@ -7,10 +7,13 @@ import { CreateTaskForm } from "@/features/create-task/ui/CreateTaskForm"
 import { Spinner, toast } from "@/shared/ui"
 import { ApiError } from "@/shared/api"
 import { CheckCircle2 } from "lucide-react"
+import type { TaskStatus } from "@/entities/task/model/types"
 
 interface TaskTableProps {
   listId: string
   date?: "all" | "today" | "week" | "overdue"
+  status?: TaskStatus
+  search?: string
 }
 
 /**
