@@ -2,11 +2,10 @@
 
 import { useMemo } from "react"
 import { useListTasks } from "@/entities/task/api/queries"
-import { useToggleTask, useDeleteTask } from "@/entities/task/api/mutations"
+import { useTaskHandlers } from "@/entities/task/model/useTaskHandlers"
 import { TaskRow } from "@/entities/task/ui/TaskRow"
 import { CreateTaskForm } from "@/features/create-task/ui/CreateTaskForm"
-import { Spinner, toast } from "@/shared/ui"
-import { ApiError } from "@/shared/api"
+import { Spinner } from "@/shared/ui"
 import { CheckCircle2 } from "lucide-react"
 import type { Task, TaskStatus } from "@/entities/task/model/types"
 
@@ -51,8 +50,7 @@ function filterTasks(tasks: Task[], status: TaskStatus, search: string): Task[] 
  */
 export function TaskTable({ listId, date = "all", status = "all", search = "" }: TaskTableProps) {
   const { data: tasks, isLoading, error } = useListTasks(listId, { date })
-  const toggleTask = useToggleTask(listId)
-  const deleteTask = useDeleteTask(listId)
+  const { handleToggle, handleDelete } = useTaskHandlers(listId)
 
   // Apply client-side filters
   const filteredTasks = useMemo(() => {
@@ -62,25 +60,6 @@ export function TaskTable({ listId, date = "all", status = "all", search = "" }:
 
   const pendingTasks = filteredTasks.filter((t) => !t.completed)
   const completedTasks = filteredTasks.filter((t) => t.completed)
-
-  const handleToggle = async (taskId: string, completed: boolean) => {
-    try {
-      await toggleTask.mutateAsync({ taskId, completed })
-    } catch (error) {
-      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao atualizar tarefa"
-      toast.error(message)
-    }
-  }
-
-  const handleDelete = async (taskId: string) => {
-    try {
-      await deleteTask.mutateAsync(taskId)
-      toast.success("Tarefa excluída com sucesso!")
-    } catch (error) {
-      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao excluir tarefa"
-      toast.error(message)
-    }
-  }
 
   if (isLoading) {
     return (
