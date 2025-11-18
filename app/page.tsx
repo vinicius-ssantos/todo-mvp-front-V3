@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { SidebarLists } from "@/widgets/sidebar-lists";
 import { TaskTable } from "@/widgets/task-table";
 import { FiltersBar } from "@/widgets/filters-bar";
@@ -9,66 +8,30 @@ import { Button } from "@/shared/ui";
 import { http } from "@/shared/api";
 import { LogOut, ListTodo } from "lucide-react";
 import { toast } from "sonner";
+import { useDashboardFilters } from "@/shared/hooks/useDashboardFilters";
 
 /**
  * Main dashboard page
+ *
+ * Displays the task management interface with:
+ * - Sidebar for list selection
+ * - Filters bar for task filtering
+ * - Task table for viewing and managing tasks
  */
 export default function HomePage() {
   const router = useRouter();
-  const [selectedListId, setSelectedListId] = useState<string | undefined>();
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "overdue">("all");
-  const [search, setSearch] = useState("");
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
 
-  const setParams = useCallback((patch: Record<string, string | undefined>) => {
-    const qs = new URLSearchParams(searchParams.toString());
-    for (const [k, v] of Object.entries(patch)) {
-      if (!v || v === "" || v === "all") qs.delete(k);
-      else qs.set(k, v);
-    }
-    const next = `${pathname}${qs.toString() ? `?${qs.toString()}` : ""}`;
-    router.replace(next);
-  }, [router, pathname, searchParams]);
-
-  // Sincroniza estado <- URL
-  useEffect(() => {
-    const sp = new URLSearchParams(searchParams.toString());
-    const list = sp.get("list") ?? undefined;
-    const status = sp.get("status");
-    const date = sp.get("date");
-    const q = sp.get("q") ?? "";
-
-    if (list !== undefined) setSelectedListId(list);
-    if (status === "pending" || status === "completed" || status === "all" || status === null) {
-      setStatusFilter(((status ?? "all") as unknown) as "all" | "pending" | "completed");
-    }
-    if (date === "today" || date === "week" || date === "overdue" || date === "all" || date === null) {
-      setDateFilter(((date ?? "all") as unknown) as "all" | "today" | "week" | "overdue");
-    }
-    setSearch(q);
-  }, [searchParams]);
-
-  // Handlers que atualizam estado -> URL
-  const handleSelectList = (id?: string) => {
-    setSelectedListId(id);
-    setParams({ list: id });
-  };
-  const handleStatusChange = (f: "all" | "pending" | "completed") => {
-    setStatusFilter(f);
-    setParams({ status: f });
-  };
-  const handleDateChange = (d: "all" | "today" | "week" | "overdue") => {
-    setDateFilter(d);
-    setParams({ date: d });
-  };
-  const handleSearchChange = (v: string) => {
-    setSearch(v);
-    setParams({ q: v });
-  };
-
-
+  // Filter state and handlers extracted to custom hook (SRP compliance)
+  const {
+    selectedListId,
+    statusFilter,
+    dateFilter,
+    search,
+    handleSelectList,
+    handleStatusChange,
+    handleDateChange,
+    handleSearchChange,
+  } = useDashboardFilters();
 
   const handleLogout = async () => {
     try {
@@ -79,6 +42,8 @@ export default function HomePage() {
       toast.error("Erro ao fazer logout");
     }
   };
+
+  const hasActiveFilters = statusFilter !== "all" || dateFilter !== "all" || search;
 
   return (
     <div className="h-screen flex flex-col">
@@ -120,14 +85,16 @@ export default function HomePage() {
                 dateFilter={dateFilter}
                 onDateFilterChange={handleDateChange}
               />
-              {(statusFilter !== "all" || dateFilter !== "all" || search) && (
-              <div className="text-sm text-muted-foreground">
-                Filtros ativos:
-                {statusFilter !== "all" && <> Status: {statusFilter}.</>}
-                {dateFilter !== "all" && <> Prazo: {dateFilter}.</>}
-                {search && <> Busca: “{search}”.</>}
-              </div>
-            )}
+
+              {hasActiveFilters && (
+                <div className="text-sm text-muted-foreground">
+                  Filtros ativos:
+                  {statusFilter !== "all" && <> Status: {statusFilter}.</>}
+                  {dateFilter !== "all" && <> Prazo: {dateFilter}.</>}
+                  {search && <> Busca: &ldquo;{search}&rdquo;.</>}
+                </div>
+              )}
+
               <TaskTable
                 listId={selectedListId}
                 date={dateFilter}
