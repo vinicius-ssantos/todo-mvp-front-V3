@@ -80,7 +80,9 @@ export default function HomePage() {
           {selectedListId ? (
             <div className="max-w-4xl mx-auto p-6 space-y-4">
               <FiltersBar
+                statusFilter={statusFilter}
                 onFilterChange={handleStatusChange}
+                searchValue={search}
                 onSearchChange={handleSearchChange}
                 dateFilter={dateFilter}
                 onDateFilterChange={handleDateChange}
