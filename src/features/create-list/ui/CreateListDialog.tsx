@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { Plus } from "lucide-react"
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Plus } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -15,22 +15,22 @@ import {
   Input,
   Label,
   toast,
-} from "@/shared/ui"
-import { useCreateList } from "@/entities/list/api/mutations"
-import { ApiError } from "@/shared/api"
+} from "@/shared/ui";
+import { useCreateList } from "@/entities/list/api/mutations";
+import { ApiError } from "@/shared/api";
 
 const createListFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(100, "Nome muito longo"),
-})
+});
 
-type CreateListForm = z.infer<typeof createListFormSchema>
+type CreateListForm = z.infer<typeof createListFormSchema>;
 
 /**
  * Dialog to create a new list
  */
 export function CreateListDialog() {
-  const [open, setOpen] = useState(false)
-  const createList = useCreateList()
+  const [open, setOpen] = useState(false);
+  const createList = useCreateList();
 
   const {
     register,
@@ -39,19 +39,19 @@ export function CreateListDialog() {
     formState: { errors },
   } = useForm<CreateListForm>({
     resolver: zodResolver(createListFormSchema),
-  })
+  });
 
   const onSubmit = async (data: CreateListForm) => {
     try {
-      await createList.mutateAsync(data.name)
-      toast.success("Lista criada com sucesso!")
-      setOpen(false)
-      reset()
+      await createList.mutateAsync(data.name);
+      toast.success("Lista criada com sucesso!");
+      setOpen(false);
+      reset();
     } catch (error) {
-      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao criar lista"
-      toast.error(message)
+      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao criar lista";
+      toast.error(message);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -82,5 +82,5 @@ export function CreateListDialog() {
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

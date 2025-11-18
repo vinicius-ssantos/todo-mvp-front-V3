@@ -1,63 +1,63 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { resolveBackendUrl } from '../../_utils'
+import { NextRequest, NextResponse } from "next/server";
+import { resolveBackendUrl } from "../../_utils";
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8082'
-const REGISTER_PATH = process.env.REGISTER_PATH || '/api/auth/register'
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8082";
+const REGISTER_PATH = process.env.REGISTER_PATH || "/api/auth/register";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json()
+    const { email, password } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: 'missing_fields', message: 'Email e senha são obrigatórios' },
-        { status: 400 },
-      )
+        { error: "missing_fields", message: "Email e senha são obrigatórios" },
+        { status: 400 }
+      );
     }
 
-    const registerUrl = resolveBackendUrl(API_BASE_URL, REGISTER_PATH)
+    const registerUrl = resolveBackendUrl(API_BASE_URL, REGISTER_PATH);
     const backendRes = await fetch(registerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-      redirect: 'manual',
-    })
+      redirect: "manual",
+    });
 
-    const text = await backendRes.text()
-    let payload: any = {}
+    const text = await backendRes.text();
+    let payload: any = {};
     try {
-      payload = text ? JSON.parse(text) : {}
+      payload = text ? JSON.parse(text) : {};
     } catch {
-      payload = { raw: text }
+      payload = { raw: text };
     }
 
     if (!backendRes.ok) {
-      if (backendRes.status === 401 && payload?.error === 'invalid_token') {
+      if (backendRes.status === 401 && payload?.error === "invalid_token") {
         return NextResponse.json(
           {
-            error: 'email_conflict',
-            message: 'Já existe uma conta com este e-mail. Faça login ou use outro endereço.',
+            error: "email_conflict",
+            message: "Já existe uma conta com este e-mail. Faça login ou use outro endereço.",
             details: payload,
           },
-          { status: 409 },
-        )
+          { status: 409 }
+        );
       }
 
       return NextResponse.json(
         {
-          error: payload?.error || 'register_failed',
-          message: payload?.message || 'Falha ao criar conta',
+          error: payload?.error || "register_failed",
+          message: payload?.message || "Falha ao criar conta",
           details: payload,
         },
-        { status: backendRes.status },
-      )
+        { status: backendRes.status }
+      );
     }
 
-    return NextResponse.json(payload)
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json(
-      { error: 'unexpected', message: err?.message || 'Erro inesperado' },
-      { status: 500 },
-    )
+      { error: "unexpected", message: err?.message || "Erro inesperado" },
+      { status: 500 }
+    );
   }
 }

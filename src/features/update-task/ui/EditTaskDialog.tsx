@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Button,
   Dialog,
@@ -20,54 +20,34 @@ import {
   SelectValue,
   Textarea,
   toast,
-} from "@/shared/ui"
-import { ApiError } from "@/shared/api"
-import { useUpdateTask } from "@/entities/task/api/mutations"
-import type { Task, TaskLifecycleStatus } from "@/entities/task/model/types"
-import { Pencil } from "lucide-react"
-
-const priorityOptions = [
-  { value: "low", label: "Baixa" },
-  { value: "medium", label: "Média" },
-  { value: "high", label: "Alta" },
-] as const
-
-const statusOptions: { value: TaskLifecycleStatus; label: string }[] = [
-  { value: "OPEN", label: "Aberta" },
-  { value: "IN_PROGRESS", label: "Em progresso" },
-  { value: "DONE", label: "Concluída" },
-  { value: "BLOCKED", label: "Bloqueada" },
-  { value: "ARCHIVED", label: "Arquivada" },
-]
+} from "@/shared/ui";
+import { ApiError } from "@/shared/api";
+import { useUpdateTask } from "@/entities/task/api/mutations";
+import type { Task, TaskLifecycleStatus } from "@/entities/task/model/types";
+import { Pencil } from "lucide-react";
+import { TASK_PRIORITY_OPTIONS, TASK_STATUS_OPTIONS } from "@/shared/constants/task-options";
 
 const editTaskFormSchema = z.object({
   title: z.string().min(1, "Título é obrigatório").max(200, "Título muito longo"),
-  description: z
-    .string()
-    .max(1000, "Descrição muito longa")
-    .optional()
-    .or(z.literal("")),
+  description: z.string().max(1000, "Descrição muito longa").optional().or(z.literal("")),
   priority: z.enum(["low", "medium", "high"]),
-  dueDate: z
-    .string()
-    .optional()
-    .or(z.literal("")),
+  dueDate: z.string().optional().or(z.literal("")),
   status: z.enum(["OPEN", "IN_PROGRESS", "DONE", "BLOCKED", "ARCHIVED"]),
-})
+});
 
-type EditTaskForm = z.infer<typeof editTaskFormSchema>
+type EditTaskForm = z.infer<typeof editTaskFormSchema>;
 
 interface EditTaskDialogProps {
-  listId: string
-  task: Task
+  listId: string;
+  task: Task;
 }
 
 function toDateInputValue(value?: string) {
-  if (!value) return ""
+  if (!value) return "";
   try {
-    return value.slice(0, 10)
+    return value.slice(0, 10);
   } catch {
-    return ""
+    return "";
   }
 }
 
@@ -75,8 +55,8 @@ function toDateInputValue(value?: string) {
  * Dialog to edit a task's full details.
  */
 export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
-  const [open, setOpen] = useState(false)
-  const updateTask = useUpdateTask(listId)
+  const [open, setOpen] = useState(false);
+  const updateTask = useUpdateTask(listId);
 
   const defaultValues = useMemo<EditTaskForm>(
     () => ({
@@ -86,8 +66,8 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
       dueDate: toDateInputValue(task.dueDate),
       status: task.status,
     }),
-    [task],
-  )
+    [task]
+  );
 
   const {
     register,
@@ -99,16 +79,16 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
   } = useForm<EditTaskForm>({
     resolver: zodResolver(editTaskFormSchema),
     defaultValues,
-  })
+  });
 
-  const priorityValue = watch("priority")
-  const statusValue = watch("status")
+  const priorityValue = watch("priority");
+  const statusValue = watch("status");
 
   useEffect(() => {
     if (open) {
-      reset(defaultValues)
+      reset(defaultValues);
     }
-  }, [open, defaultValues, reset])
+  }, [open, defaultValues, reset]);
 
   const onSubmit = async (data: EditTaskForm) => {
     const payload = {
@@ -117,17 +97,18 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
       priority: data.priority as Task["priority"],
       dueDate: data.dueDate ? data.dueDate : null,
       status: data.status,
-    }
+    };
 
     try {
-      await updateTask.mutateAsync({ taskId: task.id, data: payload })
-      toast.success("Tarefa atualizada!")
-      setOpen(false)
+      await updateTask.mutateAsync({ taskId: task.id, data: payload });
+      toast.success("Tarefa atualizada!");
+      setOpen(false);
     } catch (error) {
-      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao atualizar tarefa"
-      toast.error(message)
+      const message =
+        error instanceof ApiError ? error.getUserMessage() : "Erro ao atualizar tarefa";
+      toast.error(message);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -155,7 +136,9 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
               placeholder="Detalhes adicionais..."
               {...register("description")}
             />
-            {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
+            {errors.description && (
+              <p className="text-sm text-destructive">{errors.description.message}</p>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -171,19 +154,23 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {priorityOptions.map((option) => (
+                  {TASK_PRIORITY_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.priority && <p className="text-sm text-destructive">{errors.priority.message}</p>}
+              {errors.priority && (
+                <p className="text-sm text-destructive">{errors.priority.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="task-dueDate">Entrega</Label>
               <Input id="task-dueDate" type="date" {...register("dueDate")} />
-              {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
+              {errors.dueDate && (
+                <p className="text-sm text-destructive">{errors.dueDate.message}</p>
+              )}
             </div>
           </div>
 
@@ -199,7 +186,7 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((option) => (
+                {TASK_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -220,5 +207,5 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -10,10 +10,10 @@ type Props = {
 
 // Este template envolve todo o segmento raiz ("/") em um Suspense boundary,
 // cobrindo qualquer uso de useSearchParams/usePathname em componentes cliente.
-export default function RootTemplate({children}: Props) {
-    return (
-        <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Carregando…</div>}>
-            {children}
-        </Suspense>
-    );
+export default function RootTemplate({ children }: Props) {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Carregando…</div>}>
+      {children}
+    </Suspense>
+  );
 }
