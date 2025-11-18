@@ -36,9 +36,8 @@ export async function getListTasks(listId: string, filters?: TaskFilters): Promi
  * Hook to fetch tasks for a list
  */
 export function useListTasks(listId: string, filters: TaskFilters = {}) {
-    const { date = "all", status = "all", search = "" } = filters
     return useQuery({
-        queryKey: [...listKeys.tasks(listId), "date", date, "status", status, "search", search],
+        queryKey: [...listKeys.tasks(listId), "filters", filters],
         queryFn: () => getListTasks(listId, filters),
         enabled: !!listId,
     })

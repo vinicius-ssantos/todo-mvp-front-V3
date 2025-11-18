@@ -3,6 +3,8 @@
  */
 export type TaskLifecycleStatus = "OPEN" | "IN_PROGRESS" | "DONE" | "BLOCKED" | "ARCHIVED"
 
+export type TaskPriority = "low" | "medium" | "high"
+
 export interface Task {
   id: string
   title: string
@@ -10,7 +12,7 @@ export interface Task {
   completed: boolean
   status: TaskLifecycleStatus
   listId: string
-  priority?: "low" | "medium" | "high"
+  priority?: TaskPriority
   dueDate?: string
   createdAt: string
   updatedAt: string

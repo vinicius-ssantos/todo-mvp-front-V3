@@ -18,8 +18,8 @@ import {
   toast,
 } from "@/shared/ui"
 import { useCreateTask } from "@/entities/task/api/mutations"
-import type { TaskLifecycleStatus } from "@/entities/task/model/types"
 import { ApiError } from "@/shared/api"
+import { TASK_PRIORITY_OPTIONS, TASK_STATUS_OPTIONS } from "@/shared/constants/task-options"
 
 const createTaskFormSchema = z.object({
   title: z.string().min(1, "Título é obrigatório").max(200, "Título muito longo"),
@@ -28,12 +28,12 @@ const createTaskFormSchema = z.object({
     .max(1000, "Descrição muito longa")
     .optional()
     .or(z.literal("")),
-  priority: z.enum(["low", "medium", "high"]).default("medium"),
+  priority: z.enum(["low", "medium", "high"]),
   dueDate: z
     .string()
     .optional()
     .or(z.literal("")),
-  status: z.enum(["OPEN", "IN_PROGRESS", "DONE", "BLOCKED", "ARCHIVED"]).default("OPEN"),
+  status: z.enum(["OPEN", "IN_PROGRESS", "DONE", "BLOCKED", "ARCHIVED"]),
 })
 
 type CreateTaskFormValues = z.infer<typeof createTaskFormSchema>
@@ -41,20 +41,6 @@ type CreateTaskFormValues = z.infer<typeof createTaskFormSchema>
 interface CreateTaskFormProps {
   listId: string
 }
-
-const priorityOptions = [
-  { value: "low", label: "Baixa" },
-  { value: "medium", label: "Média" },
-  { value: "high", label: "Alta" },
-] as const
-
-const statusOptions: { value: TaskLifecycleStatus; label: string }[] = [
-  { value: "OPEN", label: "Aberta" },
-  { value: "IN_PROGRESS", label: "Em progresso" },
-  { value: "DONE", label: "Concluída" },
-  { value: "BLOCKED", label: "Bloqueada" },
-  { value: "ARCHIVED", label: "Arquivada" },
-]
 
 /**
  * Form to create a new task with optional advanced fields.
@@ -174,7 +160,7 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {priorityOptions.map((option) => (
+                {TASK_PRIORITY_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -196,7 +182,7 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((option) => (
+                {TASK_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>

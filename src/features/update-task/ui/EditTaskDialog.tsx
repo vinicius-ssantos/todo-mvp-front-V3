@@ -25,20 +25,7 @@ import { ApiError } from "@/shared/api"
 import { useUpdateTask } from "@/entities/task/api/mutations"
 import type { Task, TaskLifecycleStatus } from "@/entities/task/model/types"
 import { Pencil } from "lucide-react"
-
-const priorityOptions = [
-  { value: "low", label: "Baixa" },
-  { value: "medium", label: "Média" },
-  { value: "high", label: "Alta" },
-] as const
-
-const statusOptions: { value: TaskLifecycleStatus; label: string }[] = [
-  { value: "OPEN", label: "Aberta" },
-  { value: "IN_PROGRESS", label: "Em progresso" },
-  { value: "DONE", label: "Concluída" },
-  { value: "BLOCKED", label: "Bloqueada" },
-  { value: "ARCHIVED", label: "Arquivada" },
-]
+import { TASK_PRIORITY_OPTIONS, TASK_STATUS_OPTIONS } from "@/shared/constants/task-options"
 
 const editTaskFormSchema = z.object({
   title: z.string().min(1, "Título é obrigatório").max(200, "Título muito longo"),
@@ -171,7 +158,7 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {priorityOptions.map((option) => (
+                  {TASK_PRIORITY_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -199,7 +186,7 @@ export function EditTaskDialog({ listId, task }: EditTaskDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((option) => (
+                {TASK_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
