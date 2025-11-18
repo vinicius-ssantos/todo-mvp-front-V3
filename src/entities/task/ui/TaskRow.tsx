@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge, Button } from "@/shared/ui"
-import { CalendarCheck, Flag, Trash2 } from "lucide-react"
-import { cn } from "@/shared/lib/utils"
-import { format, isPast, parseISO } from "date-fns"
-import type { Task } from "../model/types"
-import { EditTaskDialog } from "@/features/update-task/ui/EditTaskDialog"
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge, Button } from "@/shared/ui";
+import { CalendarCheck, Flag, Trash2 } from "lucide-react";
+import { cn } from "@/shared/lib/utils";
+import { format, isPast, parseISO } from "date-fns";
+import type { Task } from "../model/types";
+import { EditTaskDialog } from "@/features/update-task/ui/EditTaskDialog";
 
 const STATUS_LABELS: Record<Task["status"], string> = {
   OPEN: "Aberta",
@@ -14,33 +14,33 @@ const STATUS_LABELS: Record<Task["status"], string> = {
   DONE: "Concluída",
   BLOCKED: "Bloqueada",
   ARCHIVED: "Arquivada",
-}
+};
 
 const PRIORITY_LABELS: Record<NonNullable<Task["priority"]>, string> = {
   low: "Baixa",
   medium: "Média",
   high: "Alta",
-}
+};
 
 const PRIORITY_STYLES: Record<NonNullable<Task["priority"]>, string> = {
   low: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
   high: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300",
-}
+};
 
 interface TaskRowProps {
-  listId: string
-  task: Task
-  onToggle: (taskId: string, completed: boolean) => void
-  onDelete: (taskId: string) => void
+  listId: string;
+  task: Task;
+  onToggle: (taskId: string, completed: boolean) => void;
+  onDelete: (taskId: string) => void;
 }
 
 /**
  * Task row component for displaying a single task with metadata.
  */
 export function TaskRow({ listId, task, onToggle, onDelete }: TaskRowProps) {
-  const dueDate = task.dueDate ? parseISO(task.dueDate) : null
-  const overdue = dueDate ? isPast(dueDate) && !task.completed : false
+  const dueDate = task.dueDate ? parseISO(task.dueDate) : null;
+  const overdue = dueDate ? isPast(dueDate) && !task.completed : false;
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/50">
@@ -53,7 +53,12 @@ export function TaskRow({ listId, task, onToggle, onDelete }: TaskRowProps) {
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className={cn("text-sm font-medium", task.completed && "line-through text-muted-foreground")}>
+            <p
+              className={cn(
+                "text-sm font-medium",
+                task.completed && "line-through text-muted-foreground"
+              )}
+            >
               {task.title}
             </p>
             {task.description && (
@@ -95,7 +100,9 @@ export function TaskRow({ listId, task, onToggle, onDelete }: TaskRowProps) {
               variant="outline"
               className={cn(
                 "border-transparent gap-1",
-                overdue ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300" : "bg-muted text-muted-foreground",
+                overdue
+                  ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                  : "bg-muted text-muted-foreground"
               )}
             >
               <CalendarCheck className="h-3 w-3" />
@@ -105,5 +112,5 @@ export function TaskRow({ listId, task, onToggle, onDelete }: TaskRowProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

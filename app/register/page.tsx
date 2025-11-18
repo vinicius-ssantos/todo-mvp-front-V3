@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useRouter } from "next/navigation"
-import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, toast } from "@/shared/ui"
-import { http, ApiError } from "@/shared/api"
-import { ListTodo } from "lucide-react"
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useRouter } from "next/navigation";
+import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, toast } from "@/shared/ui";
+import { http, ApiError } from "@/shared/api";
+import { ListTodo } from "lucide-react";
 
 const registerFormSchema = z
   .object({
@@ -18,15 +18,15 @@ const registerFormSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "As senhas não coincidem",
     path: ["confirmPassword"],
-  })
+  });
 
-type RegisterForm = z.infer<typeof registerFormSchema>
+type RegisterForm = z.infer<typeof registerFormSchema>;
 
 /**
  * Register page
  */
 export default function RegisterPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   const {
     register,
@@ -34,7 +34,7 @@ export default function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerFormSchema),
-  })
+  });
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -45,15 +45,15 @@ export default function RegisterPage() {
           email: data.email,
           password: data.password,
         },
-      })
+      });
 
-      toast.success("Conta criada com sucesso! Faça login para continuar.")
-      router.push("/login")
+      toast.success("Conta criada com sucesso! Faça login para continuar.");
+      router.push("/login");
     } catch (error) {
-      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao criar conta"
-      toast.error(message)
+      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao criar conta";
+      toast.error(message);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
@@ -83,14 +83,28 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
-              <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
-              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                {...register("password")}
+              />
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-              <Input id="confirmPassword" type="password" placeholder="••••••••" {...register("confirmPassword")} />
-              {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                {...register("confirmPassword")}
+              />
+              {errors.confirmPassword && (
+                <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+              )}
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -109,5 +123,5 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

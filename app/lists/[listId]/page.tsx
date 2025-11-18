@@ -14,7 +14,7 @@ export default function ListDetailPage() {
   // CHANGED: leitura do param um pouco mais defensiva (evita cast cego).
   const params = useParams();
   const raw = params?.listId as string | string[] | undefined;
-  const listId = Array.isArray(raw) ? raw[0] : raw ?? "";
+  const listId = Array.isArray(raw) ? raw[0] : (raw ?? "");
 
   const router = useRouter();
 
@@ -41,7 +41,11 @@ export default function ListDetailPage() {
   // CHANGED: região de erro com aria e opção de retry; "Voltar" como Link sem JS imperativo.
   if (error || !list) {
     return (
-      <div className="flex items-center justify-center min-h-screen" role="alert" aria-live="assertive">
+      <div
+        className="flex items-center justify-center min-h-screen"
+        role="alert"
+        aria-live="assertive"
+      >
         <div className="text-center">
           <p className="text-destructive mb-4">Erro ao carregar lista</p>
           <div className="flex gap-2 justify-center">
@@ -69,7 +73,8 @@ export default function ListDetailPage() {
               </Link>
             </Button>
             <div className="flex items-center gap-3">
-              <ListTodo className="h-6 w-6 text-primary" aria-hidden /> {/* CHANGED: aria-hidden decorativo */}
+              <ListTodo className="h-6 w-6 text-primary" aria-hidden />{" "}
+              {/* CHANGED: aria-hidden decorativo */}
               {/* CHANGED: id para ligar no main via aria-labelledby */}
               <h1 id="list-title" className="text-2xl font-bold">
                 {list.name}

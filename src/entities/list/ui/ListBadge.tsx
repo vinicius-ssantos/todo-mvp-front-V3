@@ -1,9 +1,9 @@
-import { Badge } from "@/shared/ui"
-import type { List } from "../model/types"
+import { Badge } from "@/shared/ui";
+import type { List } from "../model/types";
 
 interface ListBadgeProps {
-  list: List
-  variant?: "default" | "secondary" | "outline"
+  list: List;
+  variant?: "default" | "secondary" | "outline";
 }
 
 /**
@@ -19,5 +19,5 @@ export function ListBadge({ list, variant = "secondary" }: ListBadgeProps) {
         </span>
       )}
     </Badge>
-  )
+  );
 }

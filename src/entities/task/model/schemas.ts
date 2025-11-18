@@ -1,12 +1,12 @@
-import { z } from "zod"
-import type { Task } from "./types"
+import { z } from "zod";
+import type { Task } from "./types";
 
 /**
  * Zod schemas for Task entity validation
  */
-export const taskPrioritySchema = z.enum(["low", "medium", "high"])
-export const taskStatusSchema = z.enum(["OPEN", "IN_PROGRESS", "DONE", "BLOCKED", "ARCHIVED"])
-export const backendTaskPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH"])
+export const taskPrioritySchema = z.enum(["low", "medium", "high"]);
+export const taskStatusSchema = z.enum(["OPEN", "IN_PROGRESS", "DONE", "BLOCKED", "ARCHIVED"]);
+export const backendTaskPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
 export const taskSchema = z.object({
   id: z.string().uuid(),
@@ -19,7 +19,7 @@ export const taskSchema = z.object({
   dueDate: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-})
+});
 
 export const backendTaskSchema = z.object({
   id: z.string().uuid(),
@@ -31,9 +31,9 @@ export const backendTaskSchema = z.object({
   position: z.number().int().nonnegative().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-})
+});
 
-export type BackendTask = z.infer<typeof backendTaskSchema>
+export type BackendTask = z.infer<typeof backendTaskSchema>;
 
 export function mapTaskFromApi(task: BackendTask, listId: string): Task {
   return {
@@ -43,18 +43,20 @@ export function mapTaskFromApi(task: BackendTask, listId: string): Task {
     completed: task.status === "DONE",
     status: task.status,
     listId,
-    priority: task.priority ? task.priority.toLowerCase() as "low" | "medium" | "high" : undefined,
+    priority: task.priority
+      ? (task.priority.toLowerCase() as "low" | "medium" | "high")
+      : undefined,
     dueDate: task.dueDate ?? undefined,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
-  }
+  };
 }
 
 export const createTaskSchema = z.object({
   title: z.string().min(1, "Título é obrigatório").max(200, "Título muito longo"),
-})
+});
 
 export const updateTaskSchema = z.object({
   title: z.string().min(1, "Título é obrigatório").max(200, "Título muito longo").optional(),
   status: taskStatusSchema.optional(),
-})
+});

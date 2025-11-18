@@ -1,46 +1,46 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import { useListTasks } from "@/entities/task/api/queries"
-import { useTaskHandlers } from "@/entities/task/model/useTaskHandlers"
-import { TaskRow } from "@/entities/task/ui/TaskRow"
-import { CreateTaskForm } from "@/features/create-task/ui/CreateTaskForm"
-import { Spinner } from "@/shared/ui"
-import { CheckCircle2 } from "lucide-react"
-import type { Task, TaskStatus } from "@/entities/task/model/types"
+import { useMemo } from "react";
+import { useListTasks } from "@/entities/task/api/queries";
+import { useTaskHandlers } from "@/entities/task/model/useTaskHandlers";
+import { TaskRow } from "@/entities/task/ui/TaskRow";
+import { CreateTaskForm } from "@/features/create-task/ui/CreateTaskForm";
+import { Spinner } from "@/shared/ui";
+import { CheckCircle2 } from "lucide-react";
+import type { Task, TaskStatus } from "@/entities/task/model/types";
 
 interface TaskTableProps {
-  listId: string
-  date?: "all" | "today" | "week" | "overdue"
-  status?: TaskStatus
-  search?: string
+  listId: string;
+  date?: "all" | "today" | "week" | "overdue";
+  status?: TaskStatus;
+  search?: string;
 }
 
 /**
  * Filters tasks based on status and search query
  */
 function filterTasks(tasks: Task[], status: TaskStatus, search: string): Task[] {
-  let filtered = tasks
+  let filtered = tasks;
 
   // Filter by status
   if (status === "pending") {
-    filtered = filtered.filter((t) => !t.completed)
+    filtered = filtered.filter((t) => !t.completed);
   } else if (status === "completed") {
-    filtered = filtered.filter((t) => t.completed)
+    filtered = filtered.filter((t) => t.completed);
   }
   // "all" shows both pending and completed
 
   // Filter by search query
   if (search.trim()) {
-    const query = search.toLowerCase().trim()
+    const query = search.toLowerCase().trim();
     filtered = filtered.filter((task) => {
-      const titleMatch = task.title.toLowerCase().includes(query)
-      const descriptionMatch = task.description?.toLowerCase().includes(query) || false
-      return titleMatch || descriptionMatch
-    })
+      const titleMatch = task.title.toLowerCase().includes(query);
+      const descriptionMatch = task.description?.toLowerCase().includes(query) || false;
+      return titleMatch || descriptionMatch;
+    });
   }
 
-  return filtered
+  return filtered;
 }
 
 /**
@@ -49,24 +49,24 @@ function filterTasks(tasks: Task[], status: TaskStatus, search: string): Task[] 
  * Supports client-side filtering by status and search query.
  */
 export function TaskTable({ listId, date = "all", status = "all", search = "" }: TaskTableProps) {
-  const { data: tasks, isLoading, error } = useListTasks(listId, { date })
-  const { handleToggle, handleDelete } = useTaskHandlers(listId)
+  const { data: tasks, isLoading, error } = useListTasks(listId, { date });
+  const { handleToggle, handleDelete } = useTaskHandlers(listId);
 
   // Apply client-side filters
   const filteredTasks = useMemo(() => {
-    if (!tasks) return []
-    return filterTasks(tasks, status, search)
-  }, [tasks, status, search])
+    if (!tasks) return [];
+    return filterTasks(tasks, status, search);
+  }, [tasks, status, search]);
 
-  const pendingTasks = filteredTasks.filter((t) => !t.completed)
-  const completedTasks = filteredTasks.filter((t) => t.completed)
+  const pendingTasks = filteredTasks.filter((t) => !t.completed);
+  const completedTasks = filteredTasks.filter((t) => t.completed);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <Spinner className="h-8 w-8" />
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -74,11 +74,11 @@ export function TaskTable({ listId, date = "all", status = "all", search = "" }:
       <div className="p-8 text-center">
         <p className="text-destructive">Erro ao carregar tarefas</p>
       </div>
-    )
+    );
   }
 
-  const hasNoTasks = tasks && tasks.length === 0
-  const hasNoFilteredTasks = filteredTasks.length === 0 && tasks && tasks.length > 0
+  const hasNoTasks = tasks && tasks.length === 0;
+  const hasNoFilteredTasks = filteredTasks.length === 0 && tasks && tasks.length > 0;
 
   return (
     <div className="space-y-6">
@@ -138,5 +138,5 @@ export function TaskTable({ listId, date = "all", status = "all", search = "" }:
         </>
       )}
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
-import { useToggleTask, useDeleteTask } from "../api/mutations"
-import { toast } from "@/shared/ui"
-import { ApiError } from "@/shared/api"
+import { useToggleTask, useDeleteTask } from "../api/mutations";
+import { toast } from "@/shared/ui";
+import { ApiError } from "@/shared/api";
 
 /**
  * Custom hook that encapsulates task mutation handlers
@@ -32,8 +32,8 @@ import { ApiError } from "@/shared/api"
  * ```
  */
 export function useTaskHandlers(listId: string) {
-  const toggleTask = useToggleTask(listId)
-  const deleteTask = useDeleteTask(listId)
+  const toggleTask = useToggleTask(listId);
+  const deleteTask = useDeleteTask(listId);
 
   /**
    * Handles toggling a task's completion status
@@ -43,15 +43,14 @@ export function useTaskHandlers(listId: string) {
    */
   const handleToggle = async (taskId: string, completed: boolean) => {
     try {
-      await toggleTask.mutateAsync({ taskId, completed })
+      await toggleTask.mutateAsync({ taskId, completed });
       // Success is silent (optimistic update already happened)
     } catch (error) {
-      const message = error instanceof ApiError
-        ? error.getUserMessage()
-        : "Erro ao atualizar tarefa"
-      toast.error(message)
+      const message =
+        error instanceof ApiError ? error.getUserMessage() : "Erro ao atualizar tarefa";
+      toast.error(message);
     }
-  }
+  };
 
   /**
    * Handles deleting a task
@@ -60,15 +59,13 @@ export function useTaskHandlers(listId: string) {
    */
   const handleDelete = async (taskId: string) => {
     try {
-      await deleteTask.mutateAsync(taskId)
-      toast.success("Tarefa excluída com sucesso!")
+      await deleteTask.mutateAsync(taskId);
+      toast.success("Tarefa excluída com sucesso!");
     } catch (error) {
-      const message = error instanceof ApiError
-        ? error.getUserMessage()
-        : "Erro ao excluir tarefa"
-      toast.error(message)
+      const message = error instanceof ApiError ? error.getUserMessage() : "Erro ao excluir tarefa";
+      toast.error(message);
     }
-  }
+  };
 
   return {
     handleToggle,
@@ -76,5 +73,5 @@ export function useTaskHandlers(listId: string) {
     // Expose mutation states for loading indicators if needed
     isTogglingTask: toggleTask.isPending,
     isDeletingTask: deleteTask.isPending,
-  }
+  };
 }
