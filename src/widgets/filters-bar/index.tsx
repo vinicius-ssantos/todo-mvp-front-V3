@@ -29,8 +29,9 @@ export function FiltersBar({
   onDateFilterChange,
 }: FiltersBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 p-4 border-b border-border bg-card">
-      <div className="flex-1 relative">
+    <div className="flex flex-col gap-3 p-4 border-b border-border bg-card">
+      {/* Search input */}
+      <div className="w-full relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Buscar tarefas..."
@@ -41,7 +42,7 @@ export function FiltersBar({
       </div>
 
       {/* Date filters */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant={dateFilter === "all" ? "default" : "outline"}
           size="sm"
@@ -73,7 +74,7 @@ export function FiltersBar({
       </div>
 
       {/* Status filters */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant={statusFilter === "all" ? "default" : "outline"}
           size="sm"

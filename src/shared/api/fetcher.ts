@@ -45,11 +45,22 @@ export async function http(input: string, options: HttpOptions = {}) {
       }
 
       const message = payload?.message || payload?.error || `Erro ${response.status}`;
-      throw new ApiError(message, response.status, {
+      const error = new ApiError(message, response.status, {
         code: payload?.code,
         hint: payload?.hint,
         action: payload?.action,
       });
+
+      // Intercept 401 responses and redirect to login
+      if (error.isUnauthorized() && typeof window !== "undefined") {
+        const currentPath = window.location.pathname;
+        // Only redirect if not already on login page
+        if (currentPath !== "/login") {
+          window.location.href = `/login?next=${encodeURIComponent(currentPath)}`;
+        }
+      }
+
+      throw error;
     }
 
     // Parse response

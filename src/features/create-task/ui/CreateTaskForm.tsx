@@ -73,6 +73,15 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
         status: data.status,
       });
       toast.success("Tarefa criada com sucesso!");
+      // Announce to screen readers
+      const announcement = document.createElement("div");
+      announcement.setAttribute("role", "status");
+      announcement.setAttribute("aria-live", "polite");
+      announcement.className = "sr-only";
+      announcement.textContent = `Tarefa ${data.title.trim()} criada com sucesso`;
+      document.body.appendChild(announcement);
+      setTimeout(() => document.body.removeChild(announcement), 1000);
+
       reset({
         title: "",
         description: "",
@@ -87,10 +96,20 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Submit with Ctrl/Cmd + Enter
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit(onSubmit)();
+    }
+  };
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
+      onKeyDown={handleKeyDown}
       className="space-y-4 rounded-lg border border-border bg-card p-4"
+      aria-label="Formulário para criar nova tarefa"
     >
       <div className="flex flex-col gap-2 md:flex-row md:items-start">
         <div className="flex-1">
@@ -116,6 +135,9 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
           size="sm"
           onClick={() => setShowAdvanced((prev) => !prev)}
           className="gap-1"
+          aria-expanded={showAdvanced}
+          aria-controls="advanced-task-options"
+          aria-label={showAdvanced ? "Ocultar opções avançadas" : "Mostrar opções avançadas"}
         >
           {showAdvanced ? (
             <>
@@ -130,7 +152,12 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
       </div>
 
       {showAdvanced && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div
+          id="advanced-task-options"
+          className="grid gap-4 md:grid-cols-2"
+          role="region"
+          aria-label="Opções avançadas"
+        >
           <div className="md:col-span-2 space-y-2">
             <Label htmlFor="new-task-description">Notas</Label>
             <Textarea
@@ -145,7 +172,7 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Prioridade</Label>
+            <Label htmlFor="new-task-priority">Prioridade</Label>
             <Select
               value={priorityValue}
               onValueChange={(value) =>
@@ -154,7 +181,11 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
                 })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger
+                id="new-task-priority"
+                className="w-full"
+                aria-label="Selecione a prioridade"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -171,14 +202,18 @@ export function CreateTaskForm({ listId }: CreateTaskFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Status inicial</Label>
+            <Label htmlFor="new-task-status">Status inicial</Label>
             <Select
               value={statusValue}
               onValueChange={(value) =>
                 setValue("status", value as CreateTaskFormValues["status"], { shouldDirty: true })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger
+                id="new-task-status"
+                className="w-full"
+                aria-label="Selecione o status inicial"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

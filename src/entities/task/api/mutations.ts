@@ -87,8 +87,13 @@ export function useCreateTask(listId: string) {
   return useMutation({
     mutationFn: (data: CreateTaskInput) => createTask(listId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false });
-      queryClient.invalidateQueries({ queryKey: listKeys.all });
+      // Invalidate all task queries for this list (exact: false)
+      // This is necessary because a new task can appear in multiple filtered views
+      queryClient.invalidateQueries({
+        queryKey: listKeys.tasks(listId),
+        exact: false,
+        refetchType: "active", // Only refetch active queries, not inactive ones
+      });
     },
   });
 }
@@ -120,8 +125,13 @@ export function useUpdateTask(listId: string) {
     mutationFn: ({ taskId, data }: { taskId: string; data: UpdateTaskInput }) =>
       updateTask(listId, taskId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false });
-      queryClient.invalidateQueries({ queryKey: listKeys.all });
+      // Invalidate all task queries for this list (exact: false)
+      // This is necessary because updated task can affect multiple filtered views
+      queryClient.invalidateQueries({
+        queryKey: listKeys.tasks(listId),
+        exact: false,
+        refetchType: "active", // Only refetch active queries, not inactive ones
+      });
     },
   });
 }
@@ -151,10 +161,12 @@ export function useToggleTask(listId: string) {
     mutationFn: ({ taskId, completed }: { taskId: string; completed: boolean }) =>
       toggleTask(listId, taskId, completed),
     onMutate: async ({ taskId, completed }) => {
+      // Cancel any outgoing refetches to prevent optimistic update from being overwritten
       await queryClient.cancelQueries({ queryKey: listKeys.tasks(listId) });
 
       const previousTasks = queryClient.getQueryData<Task[]>(listKeys.tasks(listId));
 
+      // Optimistically update all task queries for this list
       queryClient.setQueryData<Task[]>(listKeys.tasks(listId), (old) =>
         old?.map((task) =>
           task.id === taskId
@@ -166,13 +178,18 @@ export function useToggleTask(listId: string) {
       return { previousTasks };
     },
     onError: (_err, _variables, context) => {
+      // Rollback on error
       if (context?.previousTasks) {
         queryClient.setQueryData(listKeys.tasks(listId), context.previousTasks);
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false });
-      queryClient.invalidateQueries({ queryKey: listKeys.all });
+      // Refetch to ensure consistency with server
+      queryClient.invalidateQueries({
+        queryKey: listKeys.tasks(listId),
+        exact: false,
+        refetchType: "active", // Only refetch active queries, not inactive ones
+      });
     },
   });
 }
@@ -194,9 +211,32 @@ export function useDeleteTask(listId: string) {
 
   return useMutation({
     mutationFn: (taskId: string) => deleteTask(listId, taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: listKeys.tasks(listId), exact: false });
-      queryClient.invalidateQueries({ queryKey: listKeys.all });
+    onMutate: async (taskId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: listKeys.tasks(listId) });
+
+      const previousTasks = queryClient.getQueryData<Task[]>(listKeys.tasks(listId));
+
+      // Optimistically remove task from cache
+      queryClient.setQueryData<Task[]>(listKeys.tasks(listId), (old) =>
+        old?.filter((task) => task.id !== taskId)
+      );
+
+      return { previousTasks };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData(listKeys.tasks(listId), context.previousTasks);
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency with server
+      queryClient.invalidateQueries({
+        queryKey: listKeys.tasks(listId),
+        exact: false,
+        refetchType: "active", // Only refetch active queries, not inactive ones
+      });
     },
   });
 }
