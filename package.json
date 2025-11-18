@@ -18,7 +18,17 @@
     "dev:inspect:brk": "cross-env NODE_OPTIONS=\"--trace-warnings\" node --inspect-brk node_modules/next/dist/bin/next dev",
     "dev:trace": "cross-env NODE_OPTIONS=\"--trace-deprecation --trace-warnings --trace-uncaught\" next dev",
     "dev:profile": "cross-env NODE_OPTIONS=\"--cpu-prof --heap-prof\" next dev",
-    "dev:clean": "rimraf .next && next dev"
+    "dev:clean": "rimraf .next && next dev",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
@@ -85,7 +95,9 @@
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
+    "husky": "^9.1.7",
     "jsdom": "^27.2.0",
+    "lint-staged": "^16.2.6",
     "postcss": "^8.5",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
