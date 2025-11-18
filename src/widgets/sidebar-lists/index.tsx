@@ -4,7 +4,7 @@ import { useLists } from "@/entities/list/api/queries";
 import { CreateListDialog } from "@/features/create-list/ui/CreateListDialog";
 import { RenameListDialog } from "@/features/rename-list/ui/RenameListDialog";
 import { DeleteListDialog } from "@/features/delete-list/ui/DeleteListDialog";
-import { Spinner } from "@/shared/ui";
+import { SidebarListsSkeleton } from "./SidebarListsSkeleton";
 import { cn } from "@/shared/lib/utils";
 import { ListTodo } from "lucide-react";
 
@@ -20,11 +20,7 @@ export function SidebarLists({ selectedListId, onSelectList }: SidebarListsProps
   const { data: lists, isLoading, error } = useLists();
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Spinner className="h-6 w-6" />
-      </div>
-    );
+    return <SidebarListsSkeleton count={4} />;
   }
 
   if (error) {

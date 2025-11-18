@@ -23,9 +23,9 @@ const PRIORITY_LABELS: Record<NonNullable<Task["priority"]>, string> = {
 };
 
 const PRIORITY_STYLES: Record<NonNullable<Task["priority"]>, string> = {
-  low: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
-  medium: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
-  high: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+  low: "bg-priority-low text-priority-low-foreground",
+  medium: "bg-priority-medium text-priority-medium-foreground",
+  high: "bg-priority-high text-priority-high-foreground",
 };
 
 interface TaskRowProps {
@@ -117,7 +117,7 @@ export function TaskRow({ listId, task, onToggle, onDelete }: TaskRowProps) {
               className={cn(
                 "border-transparent gap-1",
                 overdue
-                  ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                  ? "bg-priority-high text-priority-high-foreground"
                   : "bg-muted text-muted-foreground"
               )}
             >

@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { useListTasks } from "@/entities/task/api/queries";
 import { useTaskHandlers } from "@/entities/task/model/useTaskHandlers";
 import { TaskRow } from "@/entities/task/ui/TaskRow";
+import { TaskTableSkeleton } from "@/entities/task/ui/TaskRowSkeleton";
 import { CreateTaskForm } from "@/features/create-task/ui/CreateTaskForm";
-import { Spinner } from "@/shared/ui";
 import { CheckCircle2 } from "lucide-react";
 import type { Task, TaskStatus } from "@/entities/task/model/types";
 
@@ -35,11 +35,7 @@ export function TaskTable({ listId, date = "all", status = "all", search = "" }:
   }, [tasks]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <Spinner className="h-8 w-8" />
-      </div>
-    );
+    return <TaskTableSkeleton count={5} />;
   }
 
   if (error) {
