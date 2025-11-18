@@ -17,49 +17,22 @@ interface TaskTableProps {
 }
 
 /**
- * Filters tasks based on status and search query
- */
-function filterTasks(tasks: Task[], status: TaskStatus, search: string): Task[] {
-  let filtered = tasks;
-
-  // Filter by status
-  if (status === "pending") {
-    filtered = filtered.filter((t) => !t.completed);
-  } else if (status === "completed") {
-    filtered = filtered.filter((t) => t.completed);
-  }
-  // "all" shows both pending and completed
-
-  // Filter by search query
-  if (search.trim()) {
-    const query = search.toLowerCase().trim();
-    filtered = filtered.filter((task) => {
-      const titleMatch = task.title.toLowerCase().includes(query);
-      const descriptionMatch = task.description?.toLowerCase().includes(query) || false;
-      return titleMatch || descriptionMatch;
-    });
-  }
-
-  return filtered;
-}
-
-/**
  * Widget to display and manage tasks for a list
  *
- * Supports client-side filtering by status and search query.
+ * All filtering (date, status, search) is handled server-side via API.
  */
 export function TaskTable({ listId, date = "all", status = "all", search = "" }: TaskTableProps) {
-  const { data: tasks, isLoading, error } = useListTasks(listId, { date });
+  const { data: tasks, isLoading, error } = useListTasks(listId, { date, status, search });
   const { handleToggle, handleDelete } = useTaskHandlers(listId);
 
-  // Apply client-side filters
-  const filteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    return filterTasks(tasks, status, search);
-  }, [tasks, status, search]);
-
-  const pendingTasks = filteredTasks.filter((t) => !t.completed);
-  const completedTasks = filteredTasks.filter((t) => t.completed);
+  // Separate tasks by completion status for display
+  const { pendingTasks, completedTasks } = useMemo(() => {
+    if (!tasks) return { pendingTasks: [], completedTasks: [] };
+    return {
+      pendingTasks: tasks.filter((t) => !t.completed),
+      completedTasks: tasks.filter((t) => t.completed),
+    };
+  }, [tasks]);
 
   if (isLoading) {
     return (
@@ -78,7 +51,6 @@ export function TaskTable({ listId, date = "all", status = "all", search = "" }:
   }
 
   const hasNoTasks = tasks && tasks.length === 0;
-  const hasNoFilteredTasks = filteredTasks.length === 0 && tasks && tasks.length > 0;
 
   return (
     <div className="space-y-6">
@@ -87,14 +59,12 @@ export function TaskTable({ listId, date = "all", status = "all", search = "" }:
       {hasNoTasks ? (
         <div className="p-12 text-center text-muted-foreground">
           <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-lg font-medium">Nenhuma tarefa ainda</p>
-          <p className="text-sm mt-1">Adicione sua primeira tarefa acima!</p>
-        </div>
-      ) : hasNoFilteredTasks ? (
-        <div className="p-12 text-center text-muted-foreground">
-          <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">Nenhuma tarefa encontrada</p>
-          <p className="text-sm mt-1">Tente ajustar os filtros de busca.</p>
+          <p className="text-sm mt-1">
+            {date !== "all" || status !== "all" || search
+              ? "Tente ajustar os filtros de busca."
+              : "Adicione sua primeira tarefa acima!"}
+          </p>
         </div>
       ) : (
         <>

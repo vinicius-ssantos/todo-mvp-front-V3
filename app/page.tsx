@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SidebarLists } from "@/widgets/sidebar-lists";
 import { TaskTable } from "@/widgets/task-table";
 import { FiltersBar } from "@/widgets/filters-bar";
 import { Button } from "@/shared/ui";
 import { http } from "@/shared/api";
-import { LogOut, ListTodo } from "lucide-react";
+import { LogOut, ListTodo, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { useDashboardFilters } from "@/shared/hooks/useDashboardFilters";
+import { useIsMobile } from "@/components/ui/use-mobile";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 /**
  * Main dashboard page
@@ -20,6 +23,8 @@ import { useDashboardFilters } from "@/shared/hooks/useDashboardFilters";
  */
 export default function HomePage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Filter state and handlers extracted to custom hook (SRP compliance)
   const {
@@ -49,12 +54,22 @@ export default function HomePage() {
     <div className="h-screen flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card">
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4">
           <div className="flex items-center gap-3">
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(true)}
+                className="md:hidden"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            )}
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <ListTodo className="h-5 w-5 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-bold">TodoList App</h1>
+            <h1 className="text-lg md:text-xl font-bold">TodoList App</h1>
           </div>
           <Button
             variant="outline"
@@ -63,22 +78,39 @@ export default function HomePage() {
             className="gap-2 bg-transparent"
           >
             <LogOut className="h-4 w-4" />
-            Sair
+            <span className="hidden sm:inline">Sair</span>
           </Button>
         </div>
       </header>
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-80 border-r border-border bg-card overflow-hidden">
-          <SidebarLists selectedListId={selectedListId} onSelectList={handleSelectList} />
-        </aside>
+        {/* Desktop Sidebar */}
+        {!isMobile && (
+          <aside className="w-80 border-r border-border bg-card overflow-hidden">
+            <SidebarLists selectedListId={selectedListId} onSelectList={handleSelectList} />
+          </aside>
+        )}
+
+        {/* Mobile Sidebar (Sheet) */}
+        {isMobile && (
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetContent side="left" className="w-80 p-0">
+              <SidebarLists
+                selectedListId={selectedListId}
+                onSelectList={(listId) => {
+                  handleSelectList(listId);
+                  setMobileMenuOpen(false);
+                }}
+              />
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Main area */}
         <main className="flex-1 overflow-y-auto">
           {selectedListId ? (
-            <div className="max-w-4xl mx-auto p-6 space-y-4">
+            <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-4">
               <FiltersBar
                 statusFilter={statusFilter}
                 onFilterChange={handleStatusChange}
