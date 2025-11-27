@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { http } from "@/shared/api";
-import { listsResponseSchema, listDetailSchema } from "../model/schemas";
+import { paginatedListsResponseSchema, listDetailSchema } from "../model/schemas";
 import { mapTaskFromApi } from "@/entities/task/model/schemas";
 import type { List, ListDetail } from "../model/types";
 
@@ -30,10 +30,10 @@ function computeCounts(tasks?: { status: string }[]) {
  * Fetch all lists
  */
 export async function getLists(): Promise<List[]> {
-  const data = await http("/api/lists");
-  const parsed = listsResponseSchema.parse(data);
+  const data = await http("/api/v1/lists");
+  const parsed = paginatedListsResponseSchema.parse(data);
 
-  return parsed.map((list) => ({
+  return parsed.content.map((list) => ({
     id: list.id,
     name: list.name,
     createdAt: list.createdAt,
@@ -56,7 +56,7 @@ export function useLists() {
  * Fetch single list detail
  */
 export async function getListDetail(id: string): Promise<ListDetail> {
-  const data = await http(`/api/lists/${id}`);
+  const data = await http(`/api/v1/lists/${id}`);
   const parsed = listDetailSchema.parse(data);
   const tasks = parsed.tasks.map((task) => mapTaskFromApi(task, id));
   const completed = tasks.filter((task) => task.status === STATUS_DONE).length;

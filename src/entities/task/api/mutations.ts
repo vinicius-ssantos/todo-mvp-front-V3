@@ -70,7 +70,7 @@ export async function createTask(listId: string, data: CreateTaskInput): Promise
   // ensure title is always present
   payload.title = data.title;
 
-  const response = await http(`/api/lists/${listId}/tasks`, {
+  const response = await http(`/api/v1/lists/${listId}/tasks`, {
     method: "POST",
     json: payload,
   });
@@ -109,7 +109,7 @@ export async function updateTask(
   const payload = buildTaskPayload(data);
   if (Object.keys(payload).length === 0) return;
 
-  await http(`/api/lists/${listId}/tasks/${taskId}`, {
+  await http(`/api/v1/lists/${listId}/tasks/${taskId}`, {
     method: "PATCH",
     json: payload,
   });
@@ -145,7 +145,7 @@ export async function toggleTask(
   completed: boolean
 ): Promise<void> {
   const nextStatus = completed ? STATUS_DONE : STATUS_OPEN;
-  await http(`/api/lists/${listId}/tasks/${taskId}`, {
+  await http(`/api/v1/lists/${listId}/tasks/${taskId}`, {
     method: "PATCH",
     json: { status: nextStatus },
   });
@@ -198,7 +198,7 @@ export function useToggleTask(listId: string) {
  * Delete a task
  */
 export async function deleteTask(listId: string, taskId: string): Promise<void> {
-  await http(`/api/lists/${listId}/tasks/${taskId}`, {
+  await http(`/api/v1/lists/${listId}/tasks/${taskId}`, {
     method: "DELETE",
   });
 }

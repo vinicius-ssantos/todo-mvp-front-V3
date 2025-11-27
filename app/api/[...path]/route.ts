@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Configure o host base e (opcionalmente) o prefixo da API via .env.local.
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8082";
-const API_PATH_PREFIX = process.env.API_PATH_PREFIX ?? "/api/v1";
+const API_PATH_PREFIX = process.env.API_PATH_PREFIX ?? "";
 
 // Cabeçalhos hop-by-hop não devem ser repassados
 const HOP_BY_HOP = new Set([
@@ -62,9 +62,23 @@ async function proxy(req: NextRequest, ctx: Ctx) {
     req.headers.get("Authorization") ||
     req.headers.get("authorization");
 
+  console.log("=== PROXY REQUEST DEBUG ===");
+  console.log("Method:", method);
+  console.log("Incoming URL:", incoming.href);
+  console.log("Target URL:", target.href);
+  console.log("Path segments:", path);
+  console.log("Raw token found:", rawToken ? `${rawToken.substring(0, 20)}...` : "NO TOKEN");
+  console.log("Cookies available:", {
+    token: req.cookies.get("token")?.value ? "EXISTS" : "MISSING",
+    access_token: req.cookies.get("access_token")?.value ? "EXISTS" : "MISSING",
+  });
+
   if (rawToken) {
     const bearer = rawToken.startsWith("Bearer ") ? rawToken : `Bearer ${rawToken}`;
     headers.set("Authorization", bearer);
+    console.log("Authorization header set:", bearer.substring(0, 30) + "...");
+  } else {
+    console.log("⚠️  NO TOKEN FOUND - Request will fail!");
   }
 
   // (2) lidar com body sem stream (evita 'duplex: half')
@@ -94,6 +108,22 @@ async function proxy(req: NextRequest, ctx: Ctx) {
     cache: "no-store",
     redirect: "manual",
   });
+
+  console.log("=== BACKEND RESPONSE ===");
+  console.log("Status:", backendRes.status, backendRes.statusText);
+  console.log("Response headers:", Object.fromEntries(backendRes.headers.entries()));
+
+  // Se for erro, tenta ler o body para debug
+  if (backendRes.status >= 400) {
+    const clonedRes = backendRes.clone();
+    try {
+      const errorBody = await clonedRes.text();
+      console.log("Error body:", errorBody);
+    } catch (e) {
+      console.log("Could not read error body");
+    }
+  }
+  console.log("=== END DEBUG ===\n");
 
   // copia headers de resposta (removendo os proibidos)
   const respHeaders = new Headers(backendRes.headers);

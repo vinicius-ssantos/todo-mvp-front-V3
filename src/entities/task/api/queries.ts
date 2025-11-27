@@ -27,7 +27,7 @@ const mapFiltersToParams = (f: TaskFilters) => {
 
 export async function getListTasks(listId: string, filters?: TaskFilters): Promise<Task[]> {
   const params = filters ? mapFiltersToParams(filters) : "";
-  const data = await http(`/api/lists/${listId}${params}`);
+  const data = await http(`/api/v1/lists/${listId}${params}`);
   const parsed = listTasksResponseSchema.parse(data);
   const tasks = parsed.tasks.map((t) => mapTaskFromApi(t, listId));
 

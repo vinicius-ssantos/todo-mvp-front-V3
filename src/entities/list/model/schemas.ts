@@ -18,6 +18,35 @@ export const listDetailSchema = listSchema.extend({
 
 export const listsResponseSchema = z.array(listSchema);
 
+export const paginatedListsResponseSchema = z.object({
+  content: z.array(listSchema),
+  pageable: z.object({
+    pageNumber: z.number(),
+    pageSize: z.number(),
+    sort: z.object({
+      empty: z.boolean(),
+      sorted: z.boolean(),
+      unsorted: z.boolean(),
+    }),
+    offset: z.number(),
+    paged: z.boolean(),
+    unpaged: z.boolean(),
+  }),
+  totalPages: z.number(),
+  totalElements: z.number(),
+  last: z.boolean(),
+  size: z.number(),
+  number: z.number(),
+  numberOfElements: z.number(),
+  sort: z.object({
+    empty: z.boolean(),
+    sorted: z.boolean(),
+    unsorted: z.boolean(),
+  }),
+  first: z.boolean(),
+  empty: z.boolean(),
+});
+
 export const createListSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(100, "Nome muito longo"),
 });

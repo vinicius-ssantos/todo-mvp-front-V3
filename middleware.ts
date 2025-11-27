@@ -54,7 +54,7 @@ export function middleware(req: NextRequest) {
  */
 export const config = {
   matcher: [
-    // tudo exceto api/, auth/, _next/ e favicon
-    "/((?!api/|auth/|_next/|favicon\\.ico).*)",
+    // tudo exceto api/, auth/, _next/, _vercel/ e favicon
+    "/((?!api/|auth/|_next/|_vercel/|favicon\\.ico).*)",
   ],
 };

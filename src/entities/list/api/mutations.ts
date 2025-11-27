@@ -9,7 +9,7 @@ import type { List, ListDetail } from "../model/types";
  * Create a new list
  */
 export async function createList(name: string): Promise<List> {
-  const data = await http("/api/lists", {
+  const data = await http("/api/v1/lists", {
     method: "POST",
     json: { name },
   });
@@ -40,7 +40,7 @@ export async function renameList(id: string, name: string): Promise<void> {
   try {
     // Try PUT first (unless explicitly configured to use PATCH)
     const method = usePatch ? "PATCH" : "PUT";
-    await http(`/api/lists/${id}`, {
+    await http(`/api/v1/lists/${id}`, {
       method,
       json: { name },
     });
@@ -48,7 +48,7 @@ export async function renameList(id: string, name: string): Promise<void> {
     // If PUT fails with 405 (Method Not Allowed), try PATCH
     if (error instanceof ApiError && error.status === 405 && !usePatch) {
       console.log("[Rename List] PUT not supported, falling back to PATCH");
-      await http(`/api/lists/${id}`, {
+      await http(`/api/v1/lists/${id}`, {
         method: "PATCH",
         json: { name },
       });
@@ -107,7 +107,7 @@ export function useRenameList() {
  * Delete a list
  */
 export async function deleteList(id: string): Promise<void> {
-  await http(`/api/lists/${id}`, {
+  await http(`/api/v1/lists/${id}`, {
     method: "DELETE",
   });
 }
